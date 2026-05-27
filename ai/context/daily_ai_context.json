@@ -1,0 +1,238 @@
+{
+  "project": "项目A",
+  "report_date": "2026-05-27",
+  "previous_date": "2026-05-26",
+  "overview": {
+    "current": {
+      "dau": 58899,
+      "new_users": 10497,
+      "revenue": 4970.54,
+      "ad_revenue": 1987.33,
+      "iap_revenue": 2983.21,
+      "arpdau": 0.0844,
+      "ecpm": 10.08,
+      "impressions": 197141,
+      "impressions_per_dau": 3.35,
+      "d1_retention": 0.3516,
+      "d7_retention": 0.1226
+    },
+    "previous": {
+      "dau": 57215,
+      "new_users": 10293,
+      "revenue": 5136.56,
+      "ad_revenue": 1939.88,
+      "iap_revenue": 3196.68,
+      "arpdau": 0.0898,
+      "ecpm": 6.57,
+      "impressions": 295404,
+      "impressions_per_dau": 5.16,
+      "d1_retention": 0.342,
+      "d7_retention": 0.1471
+    },
+    "change": {
+      "dau": 0.029433,
+      "new_users": 0.019819,
+      "revenue": -0.032321,
+      "ad_revenue": 0.02446,
+      "iap_revenue": -0.066779,
+      "arpdau": -0.060134,
+      "ecpm": 0.534247,
+      "impressions": -0.332639,
+      "impressions_per_dau": -0.350775,
+      "d1_retention": 0.0096,
+      "d7_retention": -0.0245
+    }
+  },
+  "alerts": [],
+  "country_top": [
+    {
+      "country": "US",
+      "platform": "android",
+      "dau": 14264,
+      "revenue": 1171.53,
+      "ad_revenue": 443.29,
+      "arpdau": 0.0821,
+      "ecpm": 7.65,
+      "impressions_per_dau": 4.06
+    },
+    {
+      "country": "US",
+      "platform": "ios",
+      "dau": 7739,
+      "revenue": 721.03,
+      "ad_revenue": 338.62,
+      "arpdau": 0.0932,
+      "ecpm": 9.95,
+      "impressions_per_dau": 4.4
+    },
+    {
+      "country": "BR",
+      "platform": "android",
+      "dau": 8084,
+      "revenue": 687.74,
+      "ad_revenue": 294.84,
+      "arpdau": 0.0851,
+      "ecpm": 7.27,
+      "impressions_per_dau": 5.02
+    },
+    {
+      "country": "IN",
+      "platform": "android",
+      "dau": 7507,
+      "revenue": 674.04,
+      "ad_revenue": 295.21,
+      "arpdau": 0.0898,
+      "ecpm": 10.16,
+      "impressions_per_dau": 3.87
+    },
+    {
+      "country": "PH",
+      "platform": "android",
+      "dau": 5967,
+      "revenue": 579.18,
+      "ad_revenue": 238.01,
+      "arpdau": 0.0971,
+      "ecpm": 11.15,
+      "impressions_per_dau": 3.58
+    }
+  ],
+  "platform_summary": [
+    {
+      "platform": "android",
+      "dau": 39955,
+      "revenue": 3473.79,
+      "ad_revenue": 1661.04,
+      "arpdau": 0.0869,
+      "ecpm": 10.22,
+      "impressions": 162469
+    },
+    {
+      "platform": "ios",
+      "dau": 20522,
+      "revenue": 1609.81,
+      "ad_revenue": 618.02,
+      "arpdau": 0.0784,
+      "ecpm": 7.3,
+      "impressions": 84615
+    }
+  ],
+  "ad_placement_top": [
+    {
+      "platform": "android",
+      "country": "US",
+      "ad_network": "AdMob",
+      "ad_placement": "rewarded_daily_bonus",
+      "ad_type": "rewarded",
+      "revenue": 234.23,
+      "impressions": 30192,
+      "ecpm": 7.76
+    },
+    {
+      "platform": "android",
+      "country": "US",
+      "ad_network": "AppLovin",
+      "ad_placement": "interstitial_level_complete",
+      "ad_type": "interstitial",
+      "revenue": 176.44,
+      "impressions": 21819,
+      "ecpm": 8.09
+    },
+    {
+      "platform": "android",
+      "country": "BR",
+      "ad_network": "AdMob",
+      "ad_placement": "rewarded_daily_bonus",
+      "ad_type": "rewarded",
+      "revenue": 137.85,
+      "impressions": 14218,
+      "ecpm": 9.7
+    },
+    {
+      "platform": "ios",
+      "country": "US",
+      "ad_network": "AdMob",
+      "ad_placement": "rewarded_daily_bonus",
+      "ad_type": "rewarded",
+      "revenue": 120.54,
+      "impressions": 16580,
+      "ecpm": 7.27
+    },
+    {
+      "platform": "android",
+      "country": "IN",
+      "ad_network": "AdMob",
+      "ad_placement": "rewarded_daily_bonus",
+      "ad_type": "rewarded",
+      "revenue": 116.51,
+      "impressions": 17040,
+      "ecpm": 6.84
+    },
+    {
+      "platform": "android",
+      "country": "PH",
+      "ad_network": "AdMob",
+      "ad_placement": "rewarded_daily_bonus",
+      "ad_type": "rewarded",
+      "revenue": 103.86,
+      "impressions": 12810,
+      "ecpm": 8.11
+    },
+    {
+      "platform": "ios",
+      "country": "US",
+      "ad_network": "AppLovin",
+      "ad_placement": "interstitial_level_complete",
+      "ad_type": "interstitial",
+      "revenue": 103.32,
+      "impressions": 12614,
+      "ecpm": 8.19
+    },
+    {
+      "platform": "android",
+      "country": "BR",
+      "ad_network": "AppLovin",
+      "ad_placement": "interstitial_level_complete",
+      "ad_type": "interstitial",
+      "revenue": 85.19,
+      "impressions": 12791,
+      "ecpm": 6.66
+    },
+    {
+      "platform": "android",
+      "country": "VN",
+      "ad_network": "AdMob",
+      "ad_placement": "rewarded_daily_bonus",
+      "ad_type": "rewarded",
+      "revenue": 78.58,
+      "impressions": 10437,
+      "ecpm": 7.53
+    },
+    {
+      "platform": "android",
+      "country": "IN",
+      "ad_network": "AppLovin",
+      "ad_placement": "interstitial_level_complete",
+      "ad_type": "interstitial",
+      "revenue": 75.73,
+      "impressions": 12471,
+      "ecpm": 6.07
+    }
+  ],
+  "existing_ai_text": [
+    {
+      "section": "核心指标总览",
+      "display_order": 1,
+      "analysis_text": "今日 DAU 62,028，环比-2.6%；营收 $5,087.58（广告 $2,035.03 + IAP $3,052.55），环比+3.7%；ARPDAU $0.0820；eCPM $12.91；首日留存 37.6%，7日留存 13.5%。"
+    },
+    {
+      "section": "关键变化解读",
+      "display_order": 2,
+      "analysis_text": "今日主要变化：美国市场 IAP 收入环比增长 8%。建议重点关注 PH 市场的 eCPM 变化，可能与 投放预算调整 有关。整体趋势向好，建议继续保持当前投放节奏。"
+    },
+    {
+      "section": "今日行动建议",
+      "display_order": 3,
+      "analysis_text": "1. 检查 BR 的 eCPM 是否持续下降；2. 确认 ios 端最新版本 v2.7.67 的留存数据；3. 评估 Facebook BR 投放渠道的 ROI 是否需要调整出价。"
+    }
+  ]
+}
