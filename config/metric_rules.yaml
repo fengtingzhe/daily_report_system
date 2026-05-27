@@ -1,0 +1,4 @@
+revenue_drop_threshold: -0.1
+dau_drop_threshold: -0.1
+ecpm_drop_threshold: -0.15
+retention_drop_point_threshold: -0.03

@@ -1,0 +1,3 @@
+tableau_datasource_dir: "data/tableau_datasource"
+workbook_path: "tableau/workbook/daily_operation_report.twbx"
+export_dir: "tableau/export"

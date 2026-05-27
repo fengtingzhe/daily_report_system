@@ -1,0 +1,12 @@
+api_keys.yaml
+data/raw/
+data/clean/
+data/mart/
+data/tableau_datasource/*.csv
+reports/
+logs/
+temp/
+archive/
+__pycache__/
+.env
+*.pyc

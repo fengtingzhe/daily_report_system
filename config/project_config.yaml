@@ -1,0 +1,7 @@
+project_name: "项目A"
+timezone: "UTC"
+default_report_date: "yesterday"
+platforms:
+  - unity
+  - applovin
+  - ga4
