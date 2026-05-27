@@ -6,13 +6,17 @@ api_keys.yaml
 __pycache__/
 *.pyc
 
-# Data directories — ignore data content, track .gitkeep for folder structure
+# Data directories — ignore real data, keep folder placeholders
 data/raw/**
 data/clean/**
 data/mart/**
 
-# Tableau data source CSVs — header files ARE committed for Tableau
-# (not ignored)
+!data/raw/**/.gitkeep
+!data/clean/**/.gitkeep
+!data/mart/**/.gitkeep
+
+# Tableau fixed datasource CSVs should be committed
+# Do not ignore data/tableau_datasource/*.csv
 
 # Report outputs
 reports/pdf/**
@@ -27,4 +31,4 @@ temp/**
 archive/**
 
 # Always allow .gitkeep files to be tracked
-!.gitkeep
+!**/.gitkeep
