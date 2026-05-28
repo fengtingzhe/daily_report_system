@@ -201,7 +201,162 @@ function bindEvents() {
   document.querySelectorAll(".preview-button").forEach((button) => {
     button.addEventListener("click", () => readFile(button.dataset.type));
   });
+
+  // GA4 config buttons
+  document.getElementById("ga4LoadBtn").addEventListener("click", loadGa4Config);
+  document.getElementById("ga4SaveBtn").addEventListener("click", saveGa4Config);
+  document.getElementById("ga4CheckBtn").addEventListener("click", checkGa4Config);
+  document.getElementById("ga4UploadBtn").addEventListener("click", uploadGa4Credentials);
+  // ga4FetchBtn is handled by .action-button selector (has data-step="fetch_ga4_api")
 }
+
+// ---------------------------------------------------------------------------
+// GA4 Configuration
+// ---------------------------------------------------------------------------
+
+function setGa4ConfigStatus(ok, text) {
+  const el = document.getElementById("ga4ConfigStatus");
+  el.textContent = text;
+  el.className = `ga4-status-badge ${ok ? "ok" : "fail"}`;
+}
+
+function setGa4CredsStatus(ok, text) {
+  const el = document.getElementById("ga4CredsStatus");
+  el.textContent = text;
+  el.className = `ga4-status-badge ${ok ? "ok" : "fail"}`;
+}
+
+function setGa4UploadMsg(ok, text) {
+  const el = document.getElementById("ga4UploadMsg");
+  el.textContent = text;
+  el.className = `ga4-hint ${ok ? "success" : "error"}`;
+}
+
+function showGa4CheckMessages(messages) {
+  const el = document.getElementById("ga4CheckMessages");
+  if (messages && messages.length) {
+    el.textContent = messages.join("\n");
+    el.className = "ga4-check-messages visible";
+  } else {
+    el.textContent = "";
+    el.className = "ga4-check-messages";
+  }
+}
+
+function getGa4FormValues() {
+  return {
+    enabled: document.getElementById("ga4Enabled").checked,
+    property_id: document.getElementById("ga4PropertyId").value.trim(),
+    credentials_path: document.getElementById("ga4CredentialsPath").value.trim(),
+    start_date: document.getElementById("ga4StartDate").value.trim(),
+    end_date: document.getElementById("ga4EndDate").value.trim(),
+    reports: {
+      daily_overview: document.getElementById("ga4ReportDailyOverview").checked,
+      country_platform_daily: document.getElementById("ga4ReportCountryPlatform").checked,
+      event_daily: document.getElementById("ga4ReportEventDaily").checked,
+    },
+  };
+}
+
+function fillGa4Form(config) {
+  const g = config.ga4;
+  document.getElementById("ga4Enabled").checked = g.enabled;
+  document.getElementById("ga4PropertyId").value = g.property_id || "";
+  document.getElementById("ga4CredentialsPath").value = g.credentials_path || "";
+  document.getElementById("ga4StartDate").value = g.start_date || "";
+  document.getElementById("ga4EndDate").value = g.end_date || "";
+  document.getElementById("ga4ReportDailyOverview").checked = g.reports.daily_overview;
+  document.getElementById("ga4ReportCountryPlatform").checked = g.reports.country_platform_daily;
+  document.getElementById("ga4ReportEventDaily").checked = g.reports.event_daily;
+
+  if (config.exists) {
+    setGa4ConfigStatus(true, "配置文件存在");
+  } else if (g.property_id) {
+    setGa4ConfigStatus(true, "已加载");
+  } else {
+    setGa4ConfigStatus(false, "未配置");
+  }
+
+  setGa4CredsStatus(config.credentials_exists, config.credentials_exists ? "凭证文件存在" : "凭证文件不存在");
+}
+
+async function loadGa4Config() {
+  try {
+    const config = await apiJson("/api/config/ga4");
+    fillGa4Form(config);
+    setGa4UploadMsg(true, "配置已加载。");
+  } catch (error) {
+    setGa4ConfigStatus(false, "加载失败");
+    setGa4UploadMsg(false, `加载失败: ${error.message}`);
+  }
+}
+
+async function saveGa4Config() {
+  const payload = getGa4FormValues();
+  try {
+    const result = await apiJson("/api/config/ga4", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+    fillGa4Form({
+      exists: true,
+      ga4: result.ga4,
+      credentials_exists: result.credentials_exists,
+    });
+    setGa4UploadMsg(true, "配置已保存到 config/api_sources.yaml。");
+  } catch (error) {
+    setGa4UploadMsg(false, `保存失败: ${error.message}`);
+  }
+}
+
+async function uploadGa4Credentials() {
+  const fileInput = document.getElementById("ga4CredentialsFile");
+  const file = fileInput.files[0];
+  if (!file) {
+    setGa4UploadMsg(false, "请先选择一个 .json 文件。");
+    return;
+  }
+
+  const formData = new FormData();
+  formData.append("file", file);
+
+  setGa4UploadMsg(true, "上传中...");
+
+  try {
+    const response = await fetch("/api/config/ga4/upload-credentials", {
+      method: "POST",
+      body: formData,
+    });
+
+    const data = await response.json();
+    if (!response.ok) {
+      throw new Error(data.detail || `HTTP ${response.status}`);
+    }
+
+    document.getElementById("ga4CredentialsPath").value = data.path;
+    setGa4CredsStatus(true, "凭证文件存在");
+    setGa4UploadMsg(true, "上传成功。");
+    fileInput.value = "";
+  } catch (error) {
+    setGa4UploadMsg(false, `上传失败: ${error.message}`);
+  }
+}
+
+async function checkGa4Config() {
+  showGa4CheckMessages(["检查中..."]);
+  try {
+    const result = await apiJson("/api/config/ga4/check", { method: "POST" });
+    showGa4CheckMessages(result.messages);
+    setGa4ConfigStatus(result.ok, result.ok ? "检查通过" : "检查未通过");
+  } catch (error) {
+    showGa4CheckMessages([`检查失败: ${error.message}`]);
+    setGa4ConfigStatus(false, "检查失败");
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Init
+// ---------------------------------------------------------------------------
 
 async function init() {
   bindEvents();
@@ -210,6 +365,7 @@ async function init() {
   try {
     await loadProjects();
     await refreshStatus();
+    loadGa4Config();
   } catch (error) {
     setRunState("failed", "Init failed");
     setText("stderrBox", error.message);

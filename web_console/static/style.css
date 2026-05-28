@@ -304,6 +304,178 @@ h3 {
   color: #ffdadd;
 }
 
+/* GA4 config panel */
+.ga4-status-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.ga4-status-badge {
+  border-radius: 999px;
+  padding: 5px 10px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.ga4-status-badge.unknown {
+  background: #edf2ef;
+  color: #405149;
+}
+
+.ga4-status-badge.ok {
+  background: #dff4e9;
+  color: #1e7c4b;
+}
+
+.ga4-status-badge.fail {
+  background: #fbe2e4;
+  color: #b02f35;
+}
+
+.ga4-form {
+  display: grid;
+  gap: 14px;
+}
+
+.ga4-field {
+  display: grid;
+  gap: 6px;
+}
+
+.ga4-field label {
+  font-size: 13px;
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.ga4-field-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+
+.ga4-input {
+  min-height: 38px;
+  border: 1px solid #b8c4be;
+  border-radius: 6px;
+  background: #fff;
+  color: var(--text);
+  padding: 8px 10px;
+  font: inherit;
+  font-size: 14px;
+}
+
+.ga4-input:focus {
+  border-color: var(--primary);
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(37, 99, 90, 0.18);
+}
+
+.ga4-checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  font-size: 14px;
+  min-height: 32px;
+}
+
+.ga4-checkbox-label input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--primary);
+  cursor: pointer;
+}
+
+.ga4-upload-row {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.ga4-file-input {
+  flex: 1;
+  min-height: 38px;
+  border: 1px solid #b8c4be;
+  border-radius: 6px;
+  background: #fff;
+  padding: 7px 8px;
+  font: inherit;
+  font-size: 14px;
+}
+
+.ga4-file-input::file-selector-button {
+  border: none;
+  border-radius: 5px;
+  background: #e8f0ed;
+  color: #1f322c;
+  padding: 5px 10px;
+  margin-right: 10px;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.ga4-file-input::file-selector-button:hover {
+  background: #d5e2dc;
+}
+
+.ga4-hint {
+  color: var(--muted);
+  font-size: 12px;
+  min-height: 16px;
+}
+
+.ga4-hint.success {
+  color: var(--success);
+}
+
+.ga4-hint.error {
+  color: var(--danger);
+}
+
+.ga4-reports-fieldset {
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 14px 16px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 18px;
+}
+
+.ga4-reports-fieldset legend {
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 600;
+  padding: 0 6px;
+}
+
+.ga4-check-messages {
+  border-radius: 6px;
+  background: #f8faf9;
+  border: 1px solid var(--line);
+  padding: 12px 14px;
+  font-size: 13px;
+  color: var(--text);
+  min-height: 40px;
+  max-height: 180px;
+  overflow: auto;
+  white-space: pre-wrap;
+  font-family: Consolas, "Cascadia Mono", monospace;
+  display: none;
+}
+
+.ga4-check-messages.visible {
+  display: block;
+}
+
+.ga4-button-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
 .path-panel ul {
   margin: 0;
   padding-left: 20px;

@@ -8,8 +8,10 @@ import time
 from pathlib import Path
 from typing import Any
 
+import json
+
 import yaml
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, File, HTTPException, Query, UploadFile
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
@@ -51,6 +53,21 @@ class RunSequenceRequest(BaseModel):
 class InitProjectRequest(BaseModel):
     project: str
     name: str = ""
+
+
+class Ga4ReportsConfig(BaseModel):
+    daily_overview: bool = True
+    country_platform_daily: bool = True
+    event_daily: bool = True
+
+
+class Ga4ConfigRequest(BaseModel):
+    enabled: bool = False
+    property_id: str = ""
+    credentials_path: str = "secrets/ga4-service-account.json"
+    start_date: str = "7daysAgo"
+    end_date: str = "yesterday"
+    reports: Ga4ReportsConfig = Ga4ReportsConfig()
 
 
 def validate_project_id(project_id: str | None) -> str:
@@ -337,6 +354,197 @@ def api_init_project(payload: InitProjectRequest) -> dict[str, Any]:
         project_name,
     ]
     return run_command(command, "init_project")
+
+
+# ---------------------------------------------------------------------------
+# GA4 Configuration helpers
+# ---------------------------------------------------------------------------
+
+GA4_CONFIG_PATH = PROJECT_ROOT / "config" / "api_sources.yaml"
+GA4_CREDENTIALS_PATH = PROJECT_ROOT / "secrets" / "ga4-service-account.json"
+GA4_DEFAULT_CONFIG: dict[str, Any] = {
+    "enabled": False,
+    "property_id": "",
+    "credentials_path": "secrets/ga4-service-account.json",
+    "start_date": "7daysAgo",
+    "end_date": "yesterday",
+    "reports": {
+        "daily_overview": True,
+        "country_platform_daily": True,
+        "event_daily": True,
+    },
+}
+
+
+def _read_api_sources() -> dict[str, Any]:
+    if not GA4_CONFIG_PATH.exists():
+        return {}
+    with open(GA4_CONFIG_PATH, "r", encoding="utf-8") as f:
+        data = yaml.safe_load(f) or {}
+    if not isinstance(data, dict):
+        return {}
+    return data
+
+
+def _write_api_sources(data: dict[str, Any]) -> None:
+    GA4_CONFIG_PATH.parent.mkdir(parents=True, exist_ok=True)
+    with open(GA4_CONFIG_PATH, "w", encoding="utf-8", newline="\n") as f:
+        yaml.safe_dump(data, f, allow_unicode=True, default_flow_style=False, sort_keys=False)
+
+
+# ---------------------------------------------------------------------------
+# GA4 Configuration API endpoints
+# ---------------------------------------------------------------------------
+
+
+@app.get("/api/config/ga4")
+def api_get_ga4_config() -> dict[str, Any]:
+    data = _read_api_sources()
+    ga4 = data.get("ga4", {})
+    if not isinstance(ga4, dict):
+        ga4 = {}
+
+    config = {
+        "exists": GA4_CONFIG_PATH.exists(),
+        "ga4": {
+            "enabled": bool(ga4.get("enabled", GA4_DEFAULT_CONFIG["enabled"])),
+            "property_id": str(ga4.get("property_id", GA4_DEFAULT_CONFIG["property_id"])).strip(),
+            "credentials_path": str(
+                ga4.get("credentials_path", GA4_DEFAULT_CONFIG["credentials_path"])
+            ).strip(),
+            "start_date": str(ga4.get("start_date", GA4_DEFAULT_CONFIG["start_date"])).strip(),
+            "end_date": str(ga4.get("end_date", GA4_DEFAULT_CONFIG["end_date"])).strip(),
+            "reports": {
+                "daily_overview": bool(
+                    ga4.get("reports", {}).get("daily_overview", True)
+                ),
+                "country_platform_daily": bool(
+                    ga4.get("reports", {}).get("country_platform_daily", True)
+                ),
+                "event_daily": bool(
+                    ga4.get("reports", {}).get("event_daily", True)
+                ),
+            },
+        },
+        "credentials_exists": GA4_CREDENTIALS_PATH.exists(),
+        "config_path": relative_path(GA4_CONFIG_PATH),
+    }
+    return config
+
+
+@app.post("/api/config/ga4")
+def api_save_ga4_config(payload: Ga4ConfigRequest) -> dict[str, Any]:
+    data = _read_api_sources()
+
+    data["ga4"] = {
+        "enabled": payload.enabled,
+        "property_id": payload.property_id.strip(),
+        "credentials_path": payload.credentials_path.strip(),
+        "start_date": payload.start_date.strip(),
+        "end_date": payload.end_date.strip(),
+        "reports": {
+            "daily_overview": payload.reports.daily_overview,
+            "country_platform_daily": payload.reports.country_platform_daily,
+            "event_daily": payload.reports.event_daily,
+        },
+    }
+
+    _write_api_sources(data)
+
+    return {
+        "ok": True,
+        "ga4": data["ga4"],
+        "credentials_exists": GA4_CREDENTIALS_PATH.exists(),
+        "config_path": relative_path(GA4_CONFIG_PATH),
+    }
+
+
+@app.post("/api/config/ga4/upload-credentials")
+async def api_upload_ga4_credentials(file: UploadFile = File(...)) -> dict[str, Any]:
+    if not file.filename or not file.filename.lower().endswith(".json"):
+        raise HTTPException(status_code=400, detail="Only .json files are allowed.")
+
+    content = await file.read()
+    if len(content) > 2 * 1024 * 1024:
+        raise HTTPException(status_code=400, detail="File too large. Maximum 2 MB.")
+
+    try:
+        json.loads(content)
+    except json.JSONDecodeError as exc:
+        raise HTTPException(status_code=400, detail=f"Invalid JSON file: {exc}") from exc
+
+    GA4_CREDENTIALS_PATH.parent.mkdir(parents=True, exist_ok=True)
+    GA4_CREDENTIALS_PATH.write_bytes(content)
+
+    return {
+        "ok": True,
+        "path": relative_path(GA4_CREDENTIALS_PATH),
+    }
+
+
+@app.post("/api/config/ga4/check")
+def api_check_ga4_config() -> dict[str, Any]:
+    messages: list[str] = []
+    ok = True
+
+    if not GA4_CONFIG_PATH.exists():
+        messages.append("config/api_sources.yaml does not exist.")
+        return {"ok": False, "messages": messages}
+
+    data = _read_api_sources()
+    ga4 = data.get("ga4", {})
+    if not isinstance(ga4, dict):
+        messages.append("ga4 section is missing or invalid in api_sources.yaml.")
+        return {"ok": False, "messages": messages}
+
+    enabled = bool(ga4.get("enabled", False))
+    if not enabled:
+        messages.append("GA4 is disabled (enabled: false).")
+        ok = False
+
+    property_id = str(ga4.get("property_id", "")).strip()
+    if not property_id:
+        messages.append("property_id is empty.")
+        ok = False
+    else:
+        messages.append(f"property_id: {property_id}")
+
+    credentials_path_text = str(ga4.get("credentials_path", "")).strip()
+    if not credentials_path_text:
+        messages.append("credentials_path is empty.")
+        ok = False
+    else:
+        cred_path = PROJECT_ROOT / credentials_path_text
+        if not cred_path.exists():
+            messages.append(f"Credentials file not found: {credentials_path_text}")
+            ok = False
+        else:
+            try:
+                with open(cred_path, "r", encoding="utf-8") as f:
+                    json.load(f)
+                messages.append(f"Credentials file OK: {credentials_path_text}")
+            except (json.JSONDecodeError, UnicodeDecodeError):
+                messages.append(f"Credentials file is not valid JSON: {credentials_path_text}")
+                ok = False
+
+    start_date = str(ga4.get("start_date", "")).strip()
+    if not start_date:
+        messages.append("start_date is empty.")
+        ok = False
+    else:
+        messages.append(f"start_date: {start_date}")
+
+    end_date = str(ga4.get("end_date", "")).strip()
+    if not end_date:
+        messages.append("end_date is empty.")
+        ok = False
+    else:
+        messages.append(f"end_date: {end_date}")
+
+    if ok:
+        messages.insert(0, "All GA4 configuration checks passed.")
+
+    return {"ok": ok, "messages": messages}
 
 
 if __name__ == "__main__":

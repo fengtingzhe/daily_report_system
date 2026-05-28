@@ -105,6 +105,83 @@
         </div>
       </section>
 
+      <section class="panel" id="ga4ConfigPanel">
+        <div class="panel-heading">
+          <div>
+            <h2>GA4 API 配置</h2>
+            <p>配置 GA4 Data API 拉数参数。所有内容保存在本地，不上传。</p>
+          </div>
+          <div class="ga4-status-row">
+            <span id="ga4ConfigStatus" class="ga4-status-badge unknown">未加载</span>
+            <span id="ga4CredsStatus" class="ga4-status-badge unknown">凭证未检查</span>
+          </div>
+        </div>
+
+        <div class="ga4-form">
+          <div class="ga4-field">
+            <label class="ga4-checkbox-label">
+              <input type="checkbox" id="ga4Enabled" />
+              <span>启用 GA4 API 拉数</span>
+            </label>
+          </div>
+
+          <div class="ga4-field">
+            <label for="ga4PropertyId">Property ID</label>
+            <input type="text" id="ga4PropertyId" placeholder="例如 123456789" class="ga4-input" />
+          </div>
+
+          <div class="ga4-field">
+            <label for="ga4CredentialsPath">Credentials Path</label>
+            <input type="text" id="ga4CredentialsPath" placeholder="secrets/ga4-service-account.json" class="ga4-input" />
+          </div>
+
+          <div class="ga4-field">
+            <label>服务账号 JSON</label>
+            <div class="ga4-upload-row">
+              <input type="file" id="ga4CredentialsFile" accept=".json" class="ga4-file-input" />
+              <button id="ga4UploadBtn" class="secondary-button">上传服务账号 JSON</button>
+            </div>
+            <span id="ga4UploadMsg" class="ga4-hint"></span>
+          </div>
+
+          <div class="ga4-field-row">
+            <div class="ga4-field">
+              <label for="ga4StartDate">Start Date</label>
+              <input type="text" id="ga4StartDate" placeholder="7daysAgo" class="ga4-input" />
+            </div>
+            <div class="ga4-field">
+              <label for="ga4EndDate">End Date</label>
+              <input type="text" id="ga4EndDate" placeholder="yesterday" class="ga4-input" />
+            </div>
+          </div>
+
+          <fieldset class="ga4-reports-fieldset">
+            <legend>Reports</legend>
+            <label class="ga4-checkbox-label">
+              <input type="checkbox" id="ga4ReportDailyOverview" checked />
+              <span>daily_overview</span>
+            </label>
+            <label class="ga4-checkbox-label">
+              <input type="checkbox" id="ga4ReportCountryPlatform" checked />
+              <span>country_platform_daily</span>
+            </label>
+            <label class="ga4-checkbox-label">
+              <input type="checkbox" id="ga4ReportEventDaily" checked />
+              <span>event_daily</span>
+            </label>
+          </fieldset>
+
+          <div id="ga4CheckMessages" class="ga4-check-messages"></div>
+
+          <div class="ga4-button-row">
+            <button id="ga4LoadBtn" class="secondary-button">加载 GA4 配置</button>
+            <button id="ga4SaveBtn" class="primary-button">保存 GA4 配置</button>
+            <button id="ga4CheckBtn" class="secondary-button">检查 GA4 配置</button>
+            <button id="ga4FetchBtn" class="action-button" data-step="fetch_ga4_api">拉取 GA4 API</button>
+          </div>
+        </div>
+      </section>
+
       <section class="panel">
         <div class="panel-heading">
           <div>

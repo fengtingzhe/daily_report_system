@@ -293,7 +293,17 @@ py scripts\fetch_ga4_api.py --project default --dry-run
 py scripts\fetch_ga4_api.py --project default
 ```
 
-也可以在 Web 控制台点击“拉取 GA4 API”。不要提交 `config/api_sources.yaml`、`secrets/` 或服务账号 JSON。
+也可以在 Web 控制台点击”拉取 GA4 API”。
+
+GA4 配置可以在 Web 控制台中完成，不需要手动编辑 YAML：
+
+1. 打开 http://127.0.0.1:8000
+2. 在 “GA4 API 配置” 面板中填写 property_id、上传服务账号 JSON、设置日期范围和 reports 开关
+3. 点击 “保存 GA4 配置” → 写入 config/api_sources.yaml
+4. 点击 “检查 GA4 配置” → 验证配置完整性
+5. 点击 “拉取 GA4 API” → 执行拉数
+
+配置会保存到 `config/api_sources.yaml`，服务账号 JSON 保存到 `secrets/ga4-service-account.json`。这两个文件都不会提交 Git。
 
 ## Git 安全规则
 
@@ -347,7 +357,7 @@ py web_console\app.py
 http://127.0.0.1:8000
 ```
 
-控制台用于选择项目、查看 raw/clean/mart/Tableau/PDF 文件数量、运行白名单日报脚本、预览 AI 输出和最新日志。它只绑定 `127.0.0.1`，不监听外网，不提供登录系统、文件删除、任意命令执行或正式发送邮件按钮。
+控制台用于选择项目、查看 raw/clean/mart/Tableau/PDF 文件数量、配置 GA4 API、运行白名单日报脚本、预览 AI 输出和最新日志。它只绑定 `127.0.0.1`，不监听外网，不提供登录系统、文件删除、任意命令执行或正式发送邮件按钮。
 
 推荐使用方式：
 

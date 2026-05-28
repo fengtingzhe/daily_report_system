@@ -31,40 +31,24 @@ http://127.0.0.1:8000
 
 ## GA4 API
 
-使用 GA4 API 前需要：
+GA4 配置现在可以直接在 Web 控制台中完成，无需手动编辑 YAML 文件。
 
-1. 在 Google Cloud 启用 Google Analytics Data API。
-2. 创建服务账号并下载 JSON。
-3. 在 GA4 后台给服务账号邮箱授予对应 Property 的查看权限。
-4. 本地创建 `config/api_sources.yaml`，不要提交这个文件。
-5. 建议把服务账号 JSON 放到 `secrets/`，不要提交 JSON。
+在 "GA4 API 配置" 面板中：
 
-配置示例：
+1. 填写 **Property ID**（例如 `123456789`）
+2. 上传 **服务账号 JSON** 到 `secrets/ga4-service-account.json`
+3. 设置 **日期范围**（start_date / end_date）
+4. 勾选需要拉取的 **reports**（daily_overview / country_platform_daily / event_daily）
+5. 点击 **保存 GA4 配置** → 写入 `config/api_sources.yaml`
+6. 点击 **检查 GA4 配置** → 验证配置是否完整
+7. 点击 **拉取 GA4 API** → 执行拉数脚本
 
-```yaml
-ga4:
-  enabled: true
-  property_id: "你的 GA4 property id"
-  credentials_path: "D:/daily_report_system/secrets/ga4-service-account.json"
-  start_date: "7daysAgo"
-  end_date: "yesterday"
-  reports:
-    daily_overview: true
-    country_platform_daily: true
-    event_daily: true
-```
+配置会写入 `config/api_sources.yaml`，服务账号 JSON 保存到 `secrets/ga4-service-account.json`。这两个文件都不会提交到 Git。
 
-检查配置但不调用 API：
-
-```powershell
-py scripts\fetch_ga4_api.py --project default --dry-run
-```
-
-正式拉取：
-
-```powershell
-py scripts\fetch_ga4_api.py --project default
-```
+前提条件：
+- 在 Google Cloud 启用 Google Analytics Data API
+- 创建服务账号并下载 JSON
+- 在 GA4 后台给服务账号邮箱授予对应 Property 的查看权限
 
 ## 安全说明
 
