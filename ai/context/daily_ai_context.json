@@ -4,43 +4,43 @@
   "previous_date": "2026-05-27",
   "overview": {
     "current": {
-      "dau": 58050,
-      "new_users": 7316,
-      "revenue": 5464.51,
-      "ad_revenue": 2229.86,
-      "iap_revenue": 3234.65,
-      "arpdau": 0.0941,
-      "ecpm": 9.45,
-      "impressions": 235984,
-      "impressions_per_dau": 4.07,
-      "d1_retention": 0.355,
-      "d7_retention": 0.1389
+      "dau": 59942,
+      "new_users": 9434,
+      "revenue": 5087.99,
+      "ad_revenue": 2183.46,
+      "iap_revenue": 2904.53,
+      "arpdau": 0.0849,
+      "ecpm": 7.18,
+      "impressions": 304243,
+      "impressions_per_dau": 5.08,
+      "d1_retention": 0.3562,
+      "d7_retention": 0.1144
     },
     "previous": {
-      "dau": 61968,
-      "new_users": 6376,
-      "revenue": 5179.55,
-      "ad_revenue": 2314.42,
-      "iap_revenue": 2865.13,
-      "arpdau": 0.0836,
-      "ecpm": 9.42,
-      "impressions": 245578,
-      "impressions_per_dau": 3.96,
-      "d1_retention": 0.3799,
-      "d7_retention": 0.1157
+      "dau": 60859,
+      "new_users": 8545,
+      "revenue": 4878.84,
+      "ad_revenue": 1918.16,
+      "iap_revenue": 2960.68,
+      "arpdau": 0.0802,
+      "ecpm": 6.05,
+      "impressions": 317209,
+      "impressions_per_dau": 5.21,
+      "d1_retention": 0.3341,
+      "d7_retention": 0.1278
     },
     "change": {
-      "dau": -0.063226,
-      "new_users": 0.147428,
-      "revenue": 0.055016,
-      "ad_revenue": -0.036536,
-      "iap_revenue": 0.128971,
-      "arpdau": 0.125598,
-      "ecpm": 0.003185,
-      "impressions": -0.039067,
-      "impressions_per_dau": 0.027778,
-      "d1_retention": -0.0249,
-      "d7_retention": 0.0232
+      "dau": -0.015068,
+      "new_users": 0.104037,
+      "revenue": 0.042869,
+      "ad_revenue": 0.13831,
+      "iap_revenue": -0.018965,
+      "arpdau": 0.058603,
+      "ecpm": 0.186777,
+      "impressions": -0.040875,
+      "impressions_per_dau": -0.024952,
+      "d1_retention": 0.0221,
+      "d7_retention": -0.0134
     }
   },
   "alerts": [],
@@ -48,72 +48,72 @@
     {
       "country": "US",
       "platform": "android",
-      "dau": 13844,
-      "revenue": 942.28,
-      "ad_revenue": 338.02,
-      "arpdau": 0.0681,
-      "ecpm": 6.79,
-      "impressions_per_dau": 3.59
-    },
-    {
-      "country": "BR",
-      "platform": "android",
-      "dau": 8343,
-      "revenue": 772.23,
-      "ad_revenue": 283.71,
-      "arpdau": 0.0926,
-      "ecpm": 9.31,
-      "impressions_per_dau": 3.65
+      "dau": 13429,
+      "revenue": 999.91,
+      "ad_revenue": 352.07,
+      "arpdau": 0.0745,
+      "ecpm": 8.51,
+      "impressions_per_dau": 3.08
     },
     {
       "country": "US",
       "platform": "ios",
-      "dau": 6911,
-      "revenue": 665.77,
-      "ad_revenue": 277.98,
-      "arpdau": 0.0963,
-      "ecpm": 7.76,
-      "impressions_per_dau": 5.18
+      "dau": 7331,
+      "revenue": 686.04,
+      "ad_revenue": 292.5,
+      "arpdau": 0.0936,
+      "ecpm": 11.28,
+      "impressions_per_dau": 3.54
     },
     {
       "country": "IN",
       "platform": "android",
-      "dau": 6642,
-      "revenue": 606.32,
-      "ad_revenue": 268.11,
-      "arpdau": 0.0913,
-      "ecpm": 9.42,
-      "impressions_per_dau": 4.29
+      "dau": 6615,
+      "revenue": 617.57,
+      "ad_revenue": 260.23,
+      "arpdau": 0.0934,
+      "ecpm": 12.64,
+      "impressions_per_dau": 3.11
+    },
+    {
+      "country": "BR",
+      "platform": "android",
+      "dau": 8788,
+      "revenue": 581.79,
+      "ad_revenue": 273.27,
+      "arpdau": 0.0662,
+      "ecpm": 8.57,
+      "impressions_per_dau": 3.63
     },
     {
       "country": "PH",
       "platform": "android",
-      "dau": 5760,
-      "revenue": 453.45,
-      "ad_revenue": 166.12,
-      "arpdau": 0.0787,
-      "ecpm": 7.92,
-      "impressions_per_dau": 3.64
+      "dau": 5640,
+      "revenue": 498.15,
+      "ad_revenue": 198.69,
+      "arpdau": 0.0883,
+      "ecpm": 8.87,
+      "impressions_per_dau": 3.97
     }
   ],
   "platform_summary": [
     {
       "platform": "android",
-      "dau": 41470,
-      "revenue": 3083.0,
-      "ad_revenue": 1193.15,
-      "arpdau": 0.0743,
-      "ecpm": 6.47,
-      "impressions": 184424
+      "dau": 39529,
+      "revenue": 3156.97,
+      "ad_revenue": 1333.27,
+      "arpdau": 0.0799,
+      "ecpm": 6.2,
+      "impressions": 215012
     },
     {
       "platform": "ios",
-      "dau": 21836,
-      "revenue": 1978.9,
-      "ad_revenue": 849.76,
-      "arpdau": 0.0906,
-      "ecpm": 7.53,
-      "impressions": 112831
+      "dau": 19615,
+      "revenue": 1929.44,
+      "ad_revenue": 713.23,
+      "arpdau": 0.0984,
+      "ecpm": 9.18,
+      "impressions": 77734
     }
   ],
   "ad_placement_top": [
@@ -123,9 +123,9 @@
       "ad_network": "AdMob",
       "ad_placement": "rewarded_daily_bonus",
       "ad_type": "rewarded",
-      "revenue": 231.84,
-      "impressions": 28345,
-      "ecpm": 8.18
+      "revenue": 237.44,
+      "impressions": 38839,
+      "ecpm": 6.11
     },
     {
       "platform": "android",
@@ -133,9 +133,9 @@
       "ad_network": "AppLovin",
       "ad_placement": "interstitial_level_complete",
       "ad_type": "interstitial",
-      "revenue": 202.41,
-      "impressions": 18565,
-      "ecpm": 10.9
+      "revenue": 155.98,
+      "impressions": 21961,
+      "ecpm": 7.1
     },
     {
       "platform": "android",
@@ -143,9 +143,9 @@
       "ad_network": "AdMob",
       "ad_placement": "rewarded_daily_bonus",
       "ad_type": "rewarded",
-      "revenue": 118.51,
-      "impressions": 13583,
-      "ecpm": 8.72
+      "revenue": 130.19,
+      "impressions": 16735,
+      "ecpm": 7.78
     },
     {
       "platform": "ios",
@@ -153,9 +153,9 @@
       "ad_network": "AdMob",
       "ad_placement": "rewarded_daily_bonus",
       "ad_type": "rewarded",
-      "revenue": 110.98,
-      "impressions": 15078,
-      "ecpm": 7.36
+      "revenue": 123.11,
+      "impressions": 16633,
+      "ecpm": 7.4
     },
     {
       "platform": "android",
@@ -163,9 +163,9 @@
       "ad_network": "AdMob",
       "ad_placement": "rewarded_daily_bonus",
       "ad_type": "rewarded",
-      "revenue": 109.49,
-      "impressions": 13258,
-      "ecpm": 8.26
+      "revenue": 106.97,
+      "impressions": 12606,
+      "ecpm": 8.49
     },
     {
       "platform": "android",
@@ -173,9 +173,9 @@
       "ad_network": "AdMob",
       "ad_placement": "rewarded_daily_bonus",
       "ad_type": "rewarded",
-      "revenue": 98.29,
-      "impressions": 10629,
-      "ecpm": 9.25
+      "revenue": 100.93,
+      "impressions": 12348,
+      "ecpm": 8.17
     },
     {
       "platform": "ios",
@@ -183,19 +183,9 @@
       "ad_network": "AppLovin",
       "ad_placement": "interstitial_level_complete",
       "ad_type": "interstitial",
-      "revenue": 96.76,
-      "impressions": 8510,
-      "ecpm": 11.37
-    },
-    {
-      "platform": "android",
-      "country": "BR",
-      "ad_network": "AppLovin",
-      "ad_placement": "interstitial_level_complete",
-      "ad_type": "interstitial",
-      "revenue": 90.46,
-      "impressions": 12197,
-      "ecpm": 7.42
+      "revenue": 94.61,
+      "impressions": 14620,
+      "ecpm": 6.47
     },
     {
       "platform": "android",
@@ -203,9 +193,19 @@
       "ad_network": "AppLovin",
       "ad_placement": "interstitial_level_complete",
       "ad_type": "interstitial",
-      "revenue": 89.69,
-      "impressions": 8764,
-      "ecpm": 10.23
+      "revenue": 94.06,
+      "impressions": 7411,
+      "ecpm": 12.69
+    },
+    {
+      "platform": "android",
+      "country": "BR",
+      "ad_network": "AppLovin",
+      "ad_placement": "interstitial_level_complete",
+      "ad_type": "interstitial",
+      "revenue": 85.43,
+      "impressions": 10080,
+      "ecpm": 8.48
     },
     {
       "platform": "android",
@@ -213,26 +213,26 @@
       "ad_network": "AdMob",
       "ad_placement": "rewarded_daily_bonus",
       "ad_type": "rewarded",
-      "revenue": 85.18,
-      "impressions": 9860,
-      "ecpm": 8.64
+      "revenue": 78.62,
+      "impressions": 11455,
+      "ecpm": 6.86
     }
   ],
   "existing_ai_text": [
     {
       "section": "核心指标总览",
       "display_order": 1,
-      "analysis_text": "今日 DAU 60,867，环比-1.7%；营收 $4,989.67（广告 $1,995.87 + IAP $2,993.80），环比+2.5%；ARPDAU $0.0820；eCPM $10.42；首日留存 36.0%，7日留存 11.4%。"
+      "analysis_text": "今日 DAU 61,679，环比-1.4%；营收 $5,506.01（广告 $2,202.40 + IAP $3,303.61），环比-2.9%；ARPDAU $0.0893；eCPM $11.59；首日留存 32.8%，7日留存 13.1%。"
     },
     {
       "section": "关键变化解读",
       "display_order": 2,
-      "analysis_text": "今日主要变化：美国市场 IAP 收入环比增长 8%。建议重点关注 BR 市场的 留存率 变化，可能与 竞品活动影响 有关。整体趋势平稳，暂不需要特别干预。"
+      "analysis_text": "今日主要变化：美国市场 IAP 收入环比增长 8%。建议重点关注 VN 市场的 留存率 变化，可能与 新版本上线 有关。整体趋势需关注，建议明天重点排查数据波动原因。"
     },
     {
       "section": "今日行动建议",
       "display_order": 3,
-      "analysis_text": "1. 检查 BR 的 eCPM 是否持续下降；2. 确认 ios 端最新版本 v3.3.68 的留存数据；3. 评估 Facebook BR 投放渠道的 ROI 是否需要调整出价。"
+      "analysis_text": "1. 检查 BR 的 eCPM 是否持续下降；2. 确认 ios 端最新版本 v2.9.42 的留存数据；3. 评估 Facebook BR 投放渠道的 ROI 是否需要调整出价。"
     }
   ]
 }
