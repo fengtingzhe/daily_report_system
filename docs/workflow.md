@@ -280,3 +280,37 @@ git status
 ```
 
 确认只包含代码、配置样例和文档改动。
+
+## Web 控制台
+
+本地 Web 控制台位于：
+
+```text
+web_console/
+```
+
+启动方式：
+
+```powershell
+py web_console\app.py
+```
+
+浏览器打开：
+
+```text
+http://127.0.0.1:8000
+```
+
+控制台用于选择项目、查看 raw/clean/mart/Tableau/PDF 文件数量、运行白名单日报脚本、预览 AI 输出和最新日志。它只绑定 `127.0.0.1`，不监听外网，不提供登录系统、文件删除、任意命令执行或正式发送邮件按钮。
+
+推荐使用方式：
+
+```text
+1. 选择项目 default
+2. 把真实 CSV 放到 projects/default/data/raw/unity/、applovin/、ga4/
+3. 点击“运行真实日报流程”
+4. 打开 Tableau 刷新数据源
+5. 从 Tableau 手动导出 PDF 到 projects/default/reports/pdf/
+6. 点击“检查 PDF”
+7. 点击“邮件 Dry-run”
+```

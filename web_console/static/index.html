@@ -1,0 +1,169 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>本地游戏运营日报控制台</title>
+    <link rel="stylesheet" href="/static/style.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <div>
+        <h1>本地游戏运营日报控制台</h1>
+        <p>Daily Report System Console</p>
+      </div>
+      <div id="healthBadge" class="badge">Local only: 127.0.0.1</div>
+    </header>
+
+    <main class="layout">
+      <section class="panel project-panel">
+        <div class="panel-heading">
+          <div>
+            <h2>项目</h2>
+            <p>选择要处理的本地项目。</p>
+          </div>
+          <button id="refreshStatusBtn" class="secondary-button">刷新状态</button>
+        </div>
+
+        <div class="project-row">
+          <label for="projectSelect">Project</label>
+          <select id="projectSelect"></select>
+        </div>
+
+        <dl class="project-meta">
+          <div>
+            <dt>项目名</dt>
+            <dd id="projectName">-</dd>
+          </div>
+          <div>
+            <dt>项目路径</dt>
+            <dd id="projectPath">-</dd>
+          </div>
+        </dl>
+      </section>
+
+      <section class="status-grid" aria-label="项目目录状态">
+        <div class="status-card">
+          <span>Unity raw CSV</span>
+          <strong id="rawUnityCount">0</strong>
+        </div>
+        <div class="status-card">
+          <span>AppLovin raw CSV</span>
+          <strong id="rawApplovinCount">0</strong>
+        </div>
+        <div class="status-card">
+          <span>GA4 raw CSV</span>
+          <strong id="rawGa4Count">0</strong>
+        </div>
+        <div class="status-card">
+          <span>Clean CSV</span>
+          <strong id="cleanCount">0</strong>
+        </div>
+        <div class="status-card">
+          <span>Mart CSV</span>
+          <strong id="martCount">0</strong>
+        </div>
+        <div class="status-card">
+          <span>Tableau CSV</span>
+          <strong id="tableauCount">0</strong>
+        </div>
+        <div class="status-card">
+          <span>PDF</span>
+          <strong id="pdfCount">0</strong>
+        </div>
+      </section>
+
+      <section class="panel details-panel">
+        <div class="detail-line">
+          <span>最新 PDF</span>
+          <code id="latestPdf">-</code>
+        </div>
+        <div class="detail-line">
+          <span>最新 log</span>
+          <code id="latestLog">-</code>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-heading">
+          <div>
+            <h2>操作</h2>
+            <p>所有按钮只会调用后端白名单脚本。</p>
+          </div>
+        </div>
+
+        <div class="button-grid">
+          <button class="action-button" data-step="import_raw_csv">导入原始 CSV</button>
+          <button class="action-button" data-step="build_mart">生成 Mart</button>
+          <button class="action-button" data-step="sync_tableau">同步 Tableau 数据源</button>
+          <button class="action-button" data-step="generate_ai_context">生成 AI 上下文</button>
+          <button class="action-button" data-step="generate_ai_report">生成 AI 日报文字</button>
+          <button class="action-button" data-step="check_pdf">检查 PDF</button>
+          <button class="action-button" data-step="send_email_dry_run">邮件 Dry-run</button>
+          <button id="runPipelineBtn" class="primary-button">运行真实日报流程</button>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-heading">
+          <div>
+            <h2>文件预览</h2>
+            <p>仅允许读取项目内固定输出文件。</p>
+          </div>
+        </div>
+
+        <div class="button-grid compact">
+          <button class="preview-button" data-type="ai_report_text">查看 AI 文案 CSV</button>
+          <button class="preview-button" data-type="ai_context">查看 AI Context JSON</button>
+          <button class="preview-button" data-type="ai_draft">查看 AI Markdown 草稿</button>
+          <button class="preview-button" data-type="latest_log">查看最新日志</button>
+        </div>
+
+        <div id="previewMeta" class="preview-meta">未选择文件。</div>
+        <pre id="filePreview" class="console-output muted">文件内容会显示在这里。</pre>
+      </section>
+
+      <section class="panel">
+        <div class="panel-heading">
+          <div>
+            <h2>运行日志</h2>
+            <p>最近一次命令的 stdout / stderr。</p>
+          </div>
+          <span id="runStatus" class="run-status idle">Idle</span>
+        </div>
+
+        <dl class="run-meta">
+          <div>
+            <dt>Command</dt>
+            <dd><code id="lastCommand">-</code></dd>
+          </div>
+          <div>
+            <dt>Return code</dt>
+            <dd><code id="lastReturnCode">-</code></dd>
+          </div>
+        </dl>
+
+        <h3>stdout</h3>
+        <pre id="stdoutBox" class="console-output">-</pre>
+        <h3>stderr</h3>
+        <pre id="stderrBox" class="console-output error-output">-</pre>
+      </section>
+
+      <section class="panel path-panel">
+        <div class="panel-heading">
+          <div>
+            <h2>真实 CSV 放置路径</h2>
+            <p>把平台导出的 CSV 放到这些目录后，再运行真实日报流程。</p>
+          </div>
+        </div>
+        <ul>
+          <li><code id="rawUnityPath">projects/default/data/raw/unity/</code></li>
+          <li><code id="rawApplovinPath">projects/default/data/raw/applovin/</code></li>
+          <li><code id="rawGa4Path">projects/default/data/raw/ga4/</code></li>
+        </ul>
+      </section>
+    </main>
+
+    <script src="/static/app.js"></script>
+  </body>
+</html>
