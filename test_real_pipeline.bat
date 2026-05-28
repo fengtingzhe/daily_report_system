@@ -6,13 +6,18 @@ chcp 65001 >nul
 set "PYTHONUTF8=1"
 set "PYTHONIOENCODING=utf-8"
 
-set "RAW_DIR=data\raw\unity"
+set "PROJECT_ID=default"
+set "PROJECT_ROOT=projects\default"
+set "RAW_DIR=%PROJECT_ROOT%\data\raw\unity"
 set "RAW_CSV=%RAW_DIR%\unity_test_sample.csv"
-set "AI_TEXT=data\tableau_datasource\ai_report_text.csv"
+set "AI_TEXT=%PROJECT_ROOT%\data\tableau_datasource\ai_report_text.csv"
 
 echo ============================================
 echo Test Real Pipeline
 echo ============================================
+echo Project: %PROJECT_ID%
+echo Raw CSV: %RAW_CSV%
+echo AI text CSV: %AI_TEXT%
 echo.
 
 echo Creating sample Unity CSV...
@@ -61,27 +66,27 @@ exit /b 1
 :run_steps
 echo.
 echo [1/5] Import raw CSV...
-"%PY_CMD%" scripts\import_raw_csv.py 2>&1
+"%PY_CMD%" scripts\import_raw_csv.py --project "%PROJECT_ID%" 2>&1
 if errorlevel 1 goto failed
 
 echo.
 echo [2/5] Build mart from clean...
-"%PY_CMD%" scripts\build_mart_from_clean.py 2>&1
+"%PY_CMD%" scripts\build_mart_from_clean.py --project "%PROJECT_ID%" 2>&1
 if errorlevel 1 goto failed
 
 echo.
 echo [3/5] Sync mart to Tableau datasource...
-"%PY_CMD%" scripts\sync_mart_to_tableau_datasource.py 2>&1
+"%PY_CMD%" scripts\sync_mart_to_tableau_datasource.py --project "%PROJECT_ID%" 2>&1
 if errorlevel 1 goto failed
 
 echo.
 echo [4/5] Generate AI context...
-"%PY_CMD%" scripts\generate_ai_context.py 2>&1
+"%PY_CMD%" scripts\generate_ai_context.py --project "%PROJECT_ID%" 2>&1
 if errorlevel 1 goto failed
 
 echo.
 echo [5/5] Generate AI report...
-"%PY_CMD%" scripts\generate_ai_report.py 2>&1
+"%PY_CMD%" scripts\generate_ai_report.py --project "%PROJECT_ID%" 2>&1
 if errorlevel 1 goto failed
 
 echo.
