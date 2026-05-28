@@ -1,0 +1,9 @@
+# AI 日报生成配置。
+# 默认关闭 DeepSeek，使用本地规则模板，保证离线也能生成日报文字。
+
+use_deepseek: false
+base_url: "https://api.deepseek.com/chat/completions"
+model: "deepseek-chat"
+temperature: 0.3
+max_tokens: 2000
+fallback_to_rule_template: true

@@ -1,8 +1,8 @@
 """
-从 clean 层构建 mart 层日概览数据。
+从 clean 层构建 mart 层数据。
 
-第一版只处理 Unity clean CSV：
-data/clean/unity/*.csv -> data/mart/mart_daily_overview.csv
+当前脚本读取 data/clean/*/*.csv，使用 config/field_mappings.yaml 中维护的字段别名，
+宽松识别不同平台导出的字段，并输出 Tableau 固定数据源对应的 mart CSV。
 
 运行方式：
     python scripts/build_mart_from_clean.py
@@ -15,64 +15,125 @@ import re
 from pathlib import Path
 
 import pandas as pd
+import yaml
 
 
 # ============================================================
 # 路径常量
 # ============================================================
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
-CLEAN_UNITY_DIR = PROJECT_ROOT / "data" / "clean" / "unity"
+CLEAN_DIR = PROJECT_ROOT / "data" / "clean"
 MART_DIR = PROJECT_ROOT / "data" / "mart"
-OUTPUT_PATH = MART_DIR / "mart_daily_overview.csv"
+FIELD_MAPPING_PATH = PROJECT_ROOT / "config" / "field_mappings.yaml"
 
 
-# mart_daily_overview.csv 固定字段顺序，需要和 Tableau 日概览表结构保持一致。
-MART_COLUMNS = [
-    "date",
-    "project",
-    "dau",
-    "new_users",
-    "revenue",
-    "ad_revenue",
-    "iap_revenue",
-    "arpdau",
-    "ecpm",
-    "impressions",
-    "impressions_per_dau",
-    "d1_retention",
-    "d7_retention",
-]
+# ============================================================
+# Tableau 固定数据源表头
+# ============================================================
+MART_SCHEMAS: dict[str, list[str]] = {
+    "mart_daily_overview.csv": [
+        "date", "project", "dau", "new_users", "revenue", "ad_revenue",
+        "iap_revenue", "arpdau", "ecpm", "impressions",
+        "impressions_per_dau", "d1_retention", "d7_retention",
+    ],
+    "mart_country_daily.csv": [
+        "date", "project", "country", "platform", "dau", "new_users",
+        "revenue", "ad_revenue", "arpdau", "ecpm", "impressions",
+        "impressions_per_dau",
+    ],
+    "mart_platform_daily.csv": [
+        "date", "project", "platform", "dau", "new_users", "revenue",
+        "ad_revenue", "arpdau", "ecpm", "impressions",
+    ],
+    "mart_ad_placement_daily.csv": [
+        "date", "project", "platform", "country", "ad_network",
+        "ad_placement", "ad_type", "revenue", "impressions", "ecpm",
+    ],
+    "mart_campaign_daily.csv": [
+        "date", "project", "platform", "country", "channel", "campaign",
+        "spend", "installs", "cpi", "revenue", "d0_roas", "d1_roas",
+        "d7_roas",
+    ],
+    "mart_retention_daily.csv": [
+        "date", "project", "install_date", "platform", "country", "channel",
+        "new_users", "d1_retention", "d3_retention", "d7_retention",
+        "d14_retention", "d30_retention",
+    ],
+    "mart_version_daily.csv": [
+        "date", "project", "version", "platform", "dau", "new_users",
+        "revenue", "d1_retention", "d7_retention",
+    ],
+}
 
 
-def write_empty_mart() -> None:
-    """没有 clean 数据时，输出只有表头的 mart 文件，保证下游文件存在。"""
-    MART_DIR.mkdir(parents=True, exist_ok=True)
-    pd.DataFrame(columns=MART_COLUMNS).to_csv(
-        OUTPUT_PATH,
-        index=False,
-        encoding="utf-8-sig",
-    )
+NUMERIC_FIELDS = {
+    "dau", "new_users", "revenue", "ad_revenue", "iap_revenue",
+    "impressions", "ecpm", "spend", "installs", "d1_retention",
+    "d3_retention", "d7_retention", "d14_retention", "d30_retention",
+}
+
+INTEGER_FIELDS = {"dau", "new_users", "impressions", "installs"}
+MONEY_FIELDS = {"revenue", "ad_revenue", "iap_revenue", "spend", "ecpm"}
+RATIO_FIELDS = {
+    "arpdau", "impressions_per_dau", "cpi", "d0_roas", "d1_roas", "d7_roas",
+    "d1_retention", "d3_retention", "d7_retention", "d14_retention", "d30_retention",
+}
+
+TEXT_DEFAULTS = {
+    "project": "项目A",
+    "country": "unknown",
+    "platform": "unknown",
+    "campaign": "unknown",
+    "channel": "unknown",
+    "version": "unknown",
+    "ad_network": "unknown",
+    "ad_placement": "unknown",
+    "ad_type": "unknown",
+}
 
 
-def normalize_columns(df: pd.DataFrame) -> pd.DataFrame:
-    """统一字段名，去掉 BOM 和首尾空格，避免少量异常表头影响后续处理。"""
-    df = df.copy()
-    df.columns = [
-        str(column).replace("\ufeff", "").strip().lower()
-        for column in df.columns
-    ]
-    return df
+def relative(path: Path) -> str:
+    """输出相对项目根目录的路径，方便日志阅读。"""
+    return str(path.relative_to(PROJECT_ROOT))
 
 
-def clean_money_value(value: object) -> float:
-    """
-    将金额字段清洗成数字。
+def normalize_name(name: object) -> str:
+    """把字段名标准化，提升不同 CSV 表头的匹配容错性。"""
+    text = str(name).replace("\ufeff", "").strip().lower()
+    text = re.sub(r"[^\w]+", "_", text)
+    text = re.sub(r"_+", "_", text).strip("_")
+    return text
 
-    支持常见格式：
-    - $123.45
-    - 1,234.56
-    - 空值或无法解析的内容按 0 处理
-    """
+
+def load_field_mappings() -> dict[str, list[str]]:
+    """加载字段别名配置；配置缺失时也能使用标准字段名继续运行。"""
+    if not FIELD_MAPPING_PATH.exists():
+        print(f"WARNING: 找不到字段映射配置 {relative(FIELD_MAPPING_PATH)}，将只使用标准字段名。")
+        return {}
+
+    with open(FIELD_MAPPING_PATH, "r", encoding="utf-8") as f:
+        raw = yaml.safe_load(f) or {}
+
+    mappings: dict[str, list[str]] = {}
+    for canonical, aliases in raw.items():
+        alias_list = aliases if isinstance(aliases, list) else []
+        mappings[canonical] = [canonical, *[str(alias) for alias in alias_list]]
+    return mappings
+
+
+def find_column(df: pd.DataFrame, canonical: str, mappings: dict[str, list[str]]) -> str | None:
+    """根据标准字段名和别名配置，在 DataFrame 中找到对应的原始列名。"""
+    normalized_to_original = {normalize_name(column): column for column in df.columns}
+    aliases = mappings.get(canonical, [canonical])
+    for alias in aliases:
+        normalized_alias = normalize_name(alias)
+        if normalized_alias in normalized_to_original:
+            return normalized_to_original[normalized_alias]
+    return None
+
+
+def clean_number(value: object, *, percent: bool = False) -> float:
+    """清洗数值字段，兼容金额、千分位、百分号和空值。"""
     if value is None or pd.isna(value):
         return 0.0
 
@@ -80,158 +141,350 @@ def clean_money_value(value: object) -> float:
     if not text:
         return 0.0
 
-    # 兼容会计负数格式，例如 ($123.45)。
+    has_percent = "%" in text
     is_parenthesized_negative = text.startswith("(") and text.endswith(")")
-    text = text.strip("()")
-
-    # 去掉货币符号、千分位逗号和空白字符，只保留数字、小数点和正负号。
-    text = text.replace(",", "")
+    text = text.strip("()").replace(",", "")
     text = re.sub(r"[^0-9.+-]", "", text)
     if text in {"", "+", "-", ".", "+.", "-."}:
         return 0.0
 
     try:
-        amount = float(text)
+        number = float(text)
     except ValueError:
         return 0.0
 
-    return -amount if is_parenthesized_negative else amount
+    if is_parenthesized_negative:
+        number = -number
+    if percent and has_percent:
+        number = number / 100
+    return number
 
 
-def pick_project(df: pd.DataFrame) -> pd.Series:
-    """
-    生成 project 字段。
+def get_text_series(
+    df: pd.DataFrame,
+    canonical: str,
+    mappings: dict[str, list[str]],
+    *,
+    default: str,
+    file_name: str,
+) -> pd.Series:
+    """读取文本字段；字段缺失时使用默认值并打印 warning。"""
+    column = find_column(df, canonical, mappings)
+    if column is None:
+        print(f"WARNING: {file_name} 缺少 {canonical} 字段，默认填 {default}。")
+        return pd.Series([default] * len(df), index=df.index)
 
-    优先级：
-    1. project
-    2. project_name
-    3. 项目A
-    """
-    if "project" in df.columns:
-        project = df["project"].astype(str).str.strip()
-    elif "project_name" in df.columns:
-        project = df["project_name"].astype(str).str.strip()
-    else:
-        project = pd.Series(["项目A"] * len(df), index=df.index)
-
-    project = project.replace("", "项目A")
-    project = project.replace({"nan": "项目A", "None": "项目A"})
-    return project
+    series = df[column].astype(str).str.strip()
+    series = series.replace({"": default, "nan": default, "None": default})
+    return series
 
 
-def prepare_clean_frame(df: pd.DataFrame, file_name: str) -> pd.DataFrame:
-    """把单个 clean CSV 标准化为 mart 聚合前的最小字段集。"""
-    df = normalize_columns(df)
+def get_number_series(
+    df: pd.DataFrame,
+    canonical: str,
+    mappings: dict[str, list[str]],
+    *,
+    file_name: str,
+    percent: bool = False,
+) -> pd.Series:
+    """读取数值字段；字段缺失或解析失败时填 0。"""
+    column = find_column(df, canonical, mappings)
+    if column is None:
+        print(f"WARNING: {file_name} 缺少 {canonical} 字段，默认填 0。")
+        return pd.Series([0.0] * len(df), index=df.index)
+    return df[column].map(lambda value: clean_number(value, percent=percent))
 
-    if "date" not in df.columns:
+
+def get_optional_number_series(
+    df: pd.DataFrame,
+    canonical: str,
+    mappings: dict[str, list[str]],
+    *,
+    percent: bool = False,
+) -> pd.Series | None:
+    """读取可选数值字段；字段不存在时返回 None，不打印 warning。"""
+    column = find_column(df, canonical, mappings)
+    if column is None:
+        return None
+    return df[column].map(lambda value: clean_number(value, percent=percent))
+
+
+def read_clean_csv(csv_path: Path) -> pd.DataFrame | None:
+    """读取单个 clean CSV，失败时跳过，不中断整个流程。"""
+    for encoding in ("utf-8-sig", "utf-8", "gbk"):
+        try:
+            return pd.read_csv(csv_path, dtype=str, encoding=encoding)
+        except UnicodeDecodeError:
+            continue
+        except Exception as exc:
+            print(f"WARNING: 读取 {csv_path.name} 失败，已跳过。原因: {exc}")
+            return None
+
+    print(f"WARNING: {csv_path.name} 编码无法识别，已跳过。")
+    return None
+
+
+def prepare_standard_frame(
+    df: pd.DataFrame,
+    csv_path: Path,
+    mappings: dict[str, list[str]],
+) -> pd.DataFrame:
+    """把任意 clean CSV 转成统一字段集，供各 mart 表复用。"""
+    file_name = csv_path.name
+    df = df.copy()
+    df.columns = [normalize_name(column) for column in df.columns]
+
+    date_column = find_column(df, "date", mappings)
+    if date_column is None:
         print(f"WARNING: {file_name} 缺少 date 字段，已跳过该文件。")
-        return pd.DataFrame(columns=["date", "project", "revenue", "ad_revenue"])
+        return pd.DataFrame()
 
-    prepared = pd.DataFrame(index=df.index)
-    parsed_dates = pd.to_datetime(df["date"], errors="coerce")
+    parsed_dates = pd.to_datetime(df[date_column], errors="coerce")
     bad_date_count = int(parsed_dates.isna().sum())
     if bad_date_count:
         print(f"WARNING: {file_name} 有 {bad_date_count} 行 date 解析失败，已丢弃。")
 
-    prepared["date"] = parsed_dates.dt.strftime("%Y-%m-%d")
-    prepared["project"] = pick_project(df)
+    output = pd.DataFrame(index=df.index)
+    output["date"] = parsed_dates.dt.strftime("%Y-%m-%d")
 
-    if "revenue" in df.columns:
-        prepared["revenue"] = df["revenue"].map(clean_money_value)
-    else:
-        prepared["revenue"] = 0.0
+    for field, default in TEXT_DEFAULTS.items():
+        output[field] = get_text_series(
+            df,
+            field,
+            mappings,
+            default=default,
+            file_name=file_name,
+        )
 
-    if "ad_revenue" in df.columns:
-        prepared["ad_revenue"] = df["ad_revenue"].map(clean_money_value)
-    else:
-        prepared["ad_revenue"] = 0.0
+    # 如果没有业务平台字段，用 clean 子目录名兜底，方便追踪来源。
+    if "platform" in output.columns and (output["platform"] == "unknown").all():
+        source_platform = csv_path.parent.name
+        output["platform"] = source_platform
 
-    return prepared.dropna(subset=["date"])
+    output["install_date"] = output["date"]
+    install_date_column = find_column(df, "install_date", mappings)
+    if install_date_column is not None:
+        install_dates = pd.to_datetime(df[install_date_column], errors="coerce")
+        output["install_date"] = install_dates.dt.strftime("%Y-%m-%d").fillna(output["date"])
 
+    for field in NUMERIC_FIELDS:
+        output[field] = get_number_series(
+            df,
+            field,
+            mappings,
+            file_name=file_name,
+            percent=field.endswith("_retention"),
+        )
 
-def build_mart(all_clean_data: pd.DataFrame) -> pd.DataFrame:
-    """按 date + project 聚合 Unity clean 数据，并补齐 mart 指标字段。"""
-    grouped = (
-        all_clean_data
-        .groupby(["date", "project"], as_index=False)
-        .agg({"revenue": "sum", "ad_revenue": "sum"})
-    )
+    # 收入字段兼容：如果没有总收入，但有广告收入/IAP 收入，则合成为总收入。
+    revenue_column = find_column(df, "revenue", mappings)
+    if revenue_column is None:
+        output["revenue"] = output["ad_revenue"] + output["iap_revenue"]
 
-    mart = pd.DataFrame()
-    mart["date"] = grouped["date"]
-    mart["project"] = grouped["project"]
-    mart["dau"] = 0
-    mart["new_users"] = 0
-    mart["revenue"] = grouped["revenue"].round(2)
-    mart["ad_revenue"] = grouped["ad_revenue"].round(2)
-    mart["iap_revenue"] = (mart["revenue"] - mart["ad_revenue"]).round(2)
-
-    negative_iap = mart[mart["iap_revenue"] < 0]
+    # IAP 收入第一版按 revenue - ad_revenue 计算，保留负数并 warning。
+    output["iap_revenue"] = output["revenue"] - output["ad_revenue"]
+    negative_iap = output[output["iap_revenue"] < 0]
     if not negative_iap.empty:
-        for _, row in negative_iap.iterrows():
-            print(
-                "WARNING: iap_revenue 小于 0，"
-                f"date={row['date']}, project={row['project']}, "
-                f"iap_revenue={row['iap_revenue']}"
-            )
+        print(f"WARNING: {file_name} 有 {len(negative_iap)} 行 iap_revenue 小于 0。")
 
-    mart["arpdau"] = 0
-    mart["ecpm"] = 0
-    mart["impressions"] = 0
-    mart["impressions_per_dau"] = 0
-    mart["d1_retention"] = 0
-    mart["d7_retention"] = 0
+    output = output.dropna(subset=["date"]).reset_index(drop=True)
+    return output
 
-    mart = mart[MART_COLUMNS]
-    mart = mart.sort_values(["date", "project"]).reset_index(drop=True)
-    return mart
+
+def safe_divide(numerator: pd.Series, denominator: pd.Series, scale: float = 1.0) -> pd.Series:
+    """安全除法，分母为 0 时返回 0。"""
+    result = pd.Series([0.0] * len(numerator), index=numerator.index)
+    mask = denominator != 0
+    result.loc[mask] = numerator.loc[mask] / denominator.loc[mask] * scale
+    return result.round(4)
+
+
+def weighted_or_mean(grouped: pd.core.groupby.DataFrameGroupBy, column: str) -> pd.Series:
+    """留存等比例字段先取均值；未来可扩展为按 new_users 加权。"""
+    return grouped[column].mean().fillna(0)
+
+
+def aggregate_base(df: pd.DataFrame, dimensions: list[str]) -> pd.DataFrame:
+    """通用聚合：按维度汇总常见数值字段。"""
+    grouped = df.groupby(dimensions, as_index=False, dropna=False)
+    agg = grouped.agg({
+        "dau": "sum",
+        "new_users": "sum",
+        "revenue": "sum",
+        "ad_revenue": "sum",
+        "iap_revenue": "sum",
+        "impressions": "sum",
+        "spend": "sum",
+        "installs": "sum",
+        "d1_retention": "mean",
+        "d3_retention": "mean",
+        "d7_retention": "mean",
+        "d14_retention": "mean",
+        "d30_retention": "mean",
+    })
+    return agg
+
+
+def build_daily_overview(df: pd.DataFrame) -> pd.DataFrame:
+    """构建日概览 mart。"""
+    mart = aggregate_base(df, ["date", "project"])
+    mart["iap_revenue"] = mart["revenue"] - mart["ad_revenue"]
+    mart["arpdau"] = safe_divide(mart["revenue"], mart["dau"])
+    mart["ecpm"] = safe_divide(mart["ad_revenue"], mart["impressions"], scale=1000)
+    mart["impressions_per_dau"] = safe_divide(mart["impressions"], mart["dau"])
+    return mart[MART_SCHEMAS["mart_daily_overview.csv"]]
+
+
+def build_country_daily(df: pd.DataFrame) -> pd.DataFrame:
+    """构建国家×平台日 mart。"""
+    mart = aggregate_base(df, ["date", "project", "country", "platform"])
+    mart["arpdau"] = safe_divide(mart["revenue"], mart["dau"])
+    mart["ecpm"] = safe_divide(mart["ad_revenue"], mart["impressions"], scale=1000)
+    mart["impressions_per_dau"] = safe_divide(mart["impressions"], mart["dau"])
+    return mart[MART_SCHEMAS["mart_country_daily.csv"]]
+
+
+def build_platform_daily(df: pd.DataFrame) -> pd.DataFrame:
+    """构建平台日 mart。"""
+    mart = aggregate_base(df, ["date", "project", "platform"])
+    mart["arpdau"] = safe_divide(mart["revenue"], mart["dau"])
+    mart["ecpm"] = safe_divide(mart["ad_revenue"], mart["impressions"], scale=1000)
+    return mart[MART_SCHEMAS["mart_platform_daily.csv"]]
+
+
+def build_ad_placement_daily(df: pd.DataFrame) -> pd.DataFrame:
+    """构建广告位日 mart。"""
+    dimensions = ["date", "project", "platform", "country", "ad_network", "ad_placement", "ad_type"]
+    mart = df.groupby(dimensions, as_index=False, dropna=False).agg({
+        "ad_revenue": "sum",
+        "impressions": "sum",
+    })
+    mart = mart.rename(columns={"ad_revenue": "revenue"})
+    mart["ecpm"] = safe_divide(mart["revenue"], mart["impressions"], scale=1000)
+    return mart[MART_SCHEMAS["mart_ad_placement_daily.csv"]]
+
+
+def build_campaign_daily(df: pd.DataFrame) -> pd.DataFrame:
+    """构建投放活动日 mart。"""
+    dimensions = ["date", "project", "platform", "country", "channel", "campaign"]
+    mart = df.groupby(dimensions, as_index=False, dropna=False).agg({
+        "spend": "sum",
+        "installs": "sum",
+        "revenue": "sum",
+    })
+    mart["cpi"] = safe_divide(mart["spend"], mart["installs"])
+    mart["d0_roas"] = safe_divide(mart["revenue"], mart["spend"])
+    mart["d1_roas"] = mart["d0_roas"]
+    mart["d7_roas"] = mart["d0_roas"]
+    return mart[MART_SCHEMAS["mart_campaign_daily.csv"]]
+
+
+def build_retention_daily(df: pd.DataFrame) -> pd.DataFrame:
+    """构建留存 cohort mart。"""
+    dimensions = ["date", "project", "install_date", "platform", "country", "channel"]
+    mart = df.groupby(dimensions, as_index=False, dropna=False).agg({
+        "new_users": "sum",
+        "d1_retention": "mean",
+        "d3_retention": "mean",
+        "d7_retention": "mean",
+        "d14_retention": "mean",
+        "d30_retention": "mean",
+    })
+    return mart[MART_SCHEMAS["mart_retention_daily.csv"]]
+
+
+def build_version_daily(df: pd.DataFrame) -> pd.DataFrame:
+    """构建版本日 mart。"""
+    dimensions = ["date", "project", "version", "platform"]
+    mart = df.groupby(dimensions, as_index=False, dropna=False).agg({
+        "dau": "sum",
+        "new_users": "sum",
+        "revenue": "sum",
+        "d1_retention": "mean",
+        "d7_retention": "mean",
+    })
+    return mart[MART_SCHEMAS["mart_version_daily.csv"]]
+
+
+def write_mart(filename: str, df: pd.DataFrame) -> None:
+    """按固定字段顺序写出 mart CSV。"""
+    output_path = MART_DIR / filename
+    columns = MART_SCHEMAS[filename]
+    MART_DIR.mkdir(parents=True, exist_ok=True)
+
+    if df.empty:
+        df = pd.DataFrame(columns=columns)
+    else:
+        df = df[columns].copy()
+        df = df.sort_values([column for column in ["date", "project", "country", "platform"] if column in df.columns])
+        for column in df.columns:
+            if column in INTEGER_FIELDS:
+                df[column] = pd.to_numeric(df[column], errors="coerce").fillna(0).round(0).astype(int)
+            elif column in MONEY_FIELDS:
+                df[column] = pd.to_numeric(df[column], errors="coerce").fillna(0).round(2)
+            elif column in RATIO_FIELDS:
+                df[column] = pd.to_numeric(df[column], errors="coerce").fillna(0).round(4)
+
+    df.to_csv(output_path, index=False, encoding="utf-8-sig")
+    print(f"输出: {relative(output_path)}，{len(df)} rows")
+
+
+def write_empty_marts() -> None:
+    """没有 clean 数据时，生成所有空 mart 表头文件。"""
+    for filename, columns in MART_SCHEMAS.items():
+        write_mart(filename, pd.DataFrame(columns=columns))
 
 
 def main() -> None:
-    """主入口：扫描 Unity clean CSV，聚合并输出 mart_daily_overview.csv。"""
+    """主入口：读取 clean CSV 并生成所有 mart 表。"""
     print("开始构建 mart 数据...")
 
-    print("[1/3] 扫描 data/clean/unity/*.csv")
-    csv_files = sorted(CLEAN_UNITY_DIR.glob("*.csv"))
+    mappings = load_field_mappings()
+    print("[1/3] 扫描 data/clean/*/*.csv")
+    csv_files = sorted(CLEAN_DIR.glob("*/*.csv"))
     if not csv_files:
-        write_empty_mart()
-        print("未发现 Unity clean CSV，已生成空 mart_daily_overview.csv。")
+        write_empty_marts()
+        print("未发现 clean CSV，已生成空 mart CSV。")
         return
 
-    print(f"发现 {len(csv_files)} 个 Unity clean CSV")
+    print(f"发现 {len(csv_files)} 个 clean CSV")
 
     print("[2/3] 读取并合并 clean 数据")
-    prepared_frames: list[pd.DataFrame] = []
+    frames: list[pd.DataFrame] = []
     for csv_path in csv_files:
-        try:
-            df = pd.read_csv(csv_path, dtype=str, encoding="utf-8-sig")
-        except Exception as exc:
-            print(f"WARNING: 读取 {csv_path.name} 失败，已跳过。原因: {exc}")
+        raw_df = read_clean_csv(csv_path)
+        if raw_df is None:
             continue
 
-        print(f"读取 {csv_path.name}，{len(df)} rows")
-        prepared = prepare_clean_frame(df, csv_path.name)
-        if not prepared.empty:
-            prepared_frames.append(prepared)
+        print(f"读取 {relative(csv_path)}，{len(raw_df)} rows")
+        prepared = prepare_standard_frame(raw_df, csv_path, mappings)
+        if prepared.empty:
+            continue
+        frames.append(prepared)
 
-    if prepared_frames:
-        all_clean_data = pd.concat(prepared_frames, ignore_index=True)
-    else:
-        all_clean_data = pd.DataFrame(columns=["date", "project", "revenue", "ad_revenue"])
+    if not frames:
+        write_empty_marts()
+        print("clean CSV 均无有效数据，已生成空 mart CSV。")
+        return
 
-    print("[3/3] 聚合生成 mart_daily_overview.csv")
-    MART_DIR.mkdir(parents=True, exist_ok=True)
+    all_clean = pd.concat(frames, ignore_index=True)
 
-    if all_clean_data.empty:
-        mart = pd.DataFrame(columns=MART_COLUMNS)
-    else:
-        mart = build_mart(all_clean_data)
+    print("[3/3] 聚合生成 mart CSV")
+    builders = {
+        "mart_daily_overview.csv": build_daily_overview,
+        "mart_country_daily.csv": build_country_daily,
+        "mart_platform_daily.csv": build_platform_daily,
+        "mart_ad_placement_daily.csv": build_ad_placement_daily,
+        "mart_campaign_daily.csv": build_campaign_daily,
+        "mart_retention_daily.csv": build_retention_daily,
+        "mart_version_daily.csv": build_version_daily,
+    }
 
-    mart.to_csv(OUTPUT_PATH, index=False, encoding="utf-8-sig")
+    for filename, builder in builders.items():
+        mart_df = builder(all_clean)
+        write_mart(filename, mart_df)
 
-    relative_output = OUTPUT_PATH.relative_to(PROJECT_ROOT)
-    print(f"输出: {relative_output}")
-    print(f"完成。共 {len(mart)} 行。")
+    print("完成。")
 
 
 if __name__ == "__main__":

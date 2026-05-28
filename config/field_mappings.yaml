@@ -1,0 +1,154 @@
+# clean -> mart 字段别名配置。
+# 左侧是 mart 标准字段名，右侧是可能出现在各平台 clean CSV 中的字段名。
+
+date:
+  - date
+  - day
+  - report_date
+  - event_date
+  - 日期
+
+project:
+  - project
+  - project_name
+  - app
+  - app_name
+  - game
+  - game_name
+
+country:
+  - country
+  - country_region
+  - country_code
+  - geo
+  - region
+  - 国家
+
+platform:
+  - platform
+  - os
+  - device_platform
+  - operating_system
+  - 平台
+
+revenue:
+  - revenue
+  - total_revenue
+  - estimated_revenue
+  - revenue_usd
+  - total revenue
+  - revenue($)
+  - 收益
+  - 收入
+
+ad_revenue:
+  - ad_revenue
+  - ads_revenue
+  - ad revenue
+  - ad-revenue
+  - advertising_revenue
+
+iap_revenue:
+  - iap_revenue
+  - purchase_revenue
+  - iap revenue
+  - in_app_purchase_revenue
+
+dau:
+  - dau
+  - active_users
+  - daily_active_users
+
+new_users:
+  - new_users
+  - installs
+  - new users
+  - first_open
+
+impressions:
+  - impressions
+  - ad_impressions
+  - ad impressions
+  - impression
+  - 展示量
+
+ecpm:
+  - ecpm
+  - e_cpm
+  - eCPM
+
+campaign:
+  - campaign
+  - campaign_name
+  - campaign name
+
+channel:
+  - channel
+  - network
+  - media_source
+  - media source
+  - ad_network
+
+spend:
+  - spend
+  - cost
+  - ad_spend
+  - amount_spent
+
+installs:
+  - installs
+  - new_users
+  - conversions
+
+version:
+  - version
+  - app_version
+  - app version
+  - client_version
+
+ad_network:
+  - ad_network
+  - network
+  - ad network
+
+ad_placement:
+  - ad_placement
+  - placement
+  - placement_name
+  - ad placement
+
+ad_type:
+  - ad_type
+  - format
+  - ad_format
+  - ad type
+
+install_date:
+  - install_date
+  - cohort_date
+  - install day
+
+d1_retention:
+  - d1_retention
+  - retention_d1
+  - day1_retention
+
+d3_retention:
+  - d3_retention
+  - retention_d3
+  - day3_retention
+
+d7_retention:
+  - d7_retention
+  - retention_d7
+  - day7_retention
+
+d14_retention:
+  - d14_retention
+  - retention_d14
+  - day14_retention
+
+d30_retention:
+  - d30_retention
+  - retention_d30
+  - day30_retention

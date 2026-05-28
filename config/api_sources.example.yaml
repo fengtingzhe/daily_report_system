@@ -1,0 +1,18 @@
+# API 拉数配置示例。
+# 复制为 config/api_sources.yaml 后再填写真实参数；不要提交真实密钥。
+
+unity:
+  enabled: false
+  api_key_env: UNITY_API_KEY
+  output_dir: data/raw/unity
+
+applovin:
+  enabled: false
+  api_key_env: APPLOVIN_API_KEY
+  output_dir: data/raw/applovin
+
+ga4:
+  enabled: false
+  credentials_path: ""
+  property_id: ""
+  output_dir: data/raw/ga4
