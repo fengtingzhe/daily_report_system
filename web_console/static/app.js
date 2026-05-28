@@ -7,6 +7,18 @@ let projects = [];
 let currentStatus = null;
 let isRunning = false;
 
+const stepLabels = {
+  fetch_ga4_api: "拉取 GA4 API",
+  import_raw_csv: "导入原始 CSV",
+  build_mart: "生成 Mart",
+  sync_tableau: "同步 Tableau 数据源",
+  generate_ai_context: "生成 AI 上下文",
+  generate_ai_report: "生成 AI 日报文字",
+  run_real_pipeline: "运行真实日报流程",
+  check_pdf: "检查 PDF",
+  send_email_dry_run: "邮件 Dry-run",
+};
+
 function selectedProject() {
   return projectSelect.value || "default";
 }
@@ -120,7 +132,7 @@ async function runStep(step) {
 
   setButtonsDisabled(true);
   setRunState("running", "运行中...");
-  setText("lastCommand", step);
+  setText("lastCommand", stepLabels[step] || step);
   setText("lastReturnCode", "-");
   setText("stdoutBox", "Running...");
   setText("stderrBox", "-");

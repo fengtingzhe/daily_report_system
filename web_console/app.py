@@ -116,6 +116,7 @@ def load_project_list() -> list[dict[str, str]]:
 def build_step_command(step: str, project_id: str) -> list[str]:
     commands: dict[str, list[str]] = {
         "list_projects": [PYTHON_RUNNER, "scripts/list_projects.py"],
+        "fetch_ga4_api": [PYTHON_RUNNER, "scripts/fetch_ga4_api.py", "--project", project_id],
         "import_raw_csv": [PYTHON_RUNNER, "scripts/import_raw_csv.py", "--project", project_id],
         "build_mart": [PYTHON_RUNNER, "scripts/build_mart_from_clean.py", "--project", project_id],
         "sync_tableau": [

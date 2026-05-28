@@ -6,3 +6,5 @@ openpyxl
 python-dotenv
 fastapi
 uvicorn
+google-analytics-data
+google-auth

@@ -13,6 +13,11 @@ applovin:
 
 ga4:
   enabled: false
-  credentials_path: ""
   property_id: ""
-  output_dir: data/raw/ga4
+  credentials_path: ""
+  start_date: "7daysAgo"
+  end_date: "yesterday"
+  reports:
+    daily_overview: true
+    country_platform_daily: true
+    event_daily: true

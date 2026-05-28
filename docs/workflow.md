@@ -236,14 +236,18 @@ py scripts\send_report_email.py --send
 py scripts\send_report_email.py --project default --send
 ```
 
-## API 拉数骨架
-
-当前 API 拉数脚本只做安全占位，不强行真实调用：
+## API 拉数
 
 ```text
 scripts/fetch_unity_api.py
 scripts/fetch_applovin_api.py
 scripts/fetch_ga4_api.py
+```
+
+Unity 和 AppLovin 目前仍是安全占位脚本，不强行真实调用。GA4 已支持 Google Analytics Data API 第一版拉数，输出到：
+
+```text
+projects/default/data/raw/ga4/
 ```
 
 配置示例在：
@@ -252,7 +256,44 @@ scripts/fetch_ga4_api.py
 config/api_sources.example.yaml
 ```
 
-如需启用，请复制为 `config/api_sources.yaml` 并填写真实配置。不要提交真实密钥。
+如需启用 GA4，请先完成：
+
+```text
+1. 在 Google Cloud 启用 Google Analytics Data API
+2. 创建服务账号并下载 JSON
+3. 在 GA4 后台给服务账号邮箱授予对应 Property 的查看权限
+4. 本地创建 config/api_sources.yaml
+5. 建议把服务账号 JSON 放到 secrets/
+```
+
+`config/api_sources.yaml` 示例：
+
+```yaml
+ga4:
+  enabled: true
+  property_id: "你的 GA4 property id"
+  credentials_path: "D:/daily_report_system/secrets/ga4-service-account.json"
+  start_date: "7daysAgo"
+  end_date: "yesterday"
+  reports:
+    daily_overview: true
+    country_platform_daily: true
+    event_daily: true
+```
+
+检查配置但不调用 API：
+
+```powershell
+py scripts\fetch_ga4_api.py --project default --dry-run
+```
+
+正式拉取 GA4 raw CSV：
+
+```powershell
+py scripts\fetch_ga4_api.py --project default
+```
+
+也可以在 Web 控制台点击“拉取 GA4 API”。不要提交 `config/api_sources.yaml`、`secrets/` 或服务账号 JSON。
 
 ## Git 安全规则
 
@@ -271,6 +312,11 @@ projects/*/reports/pdf/
 logs/
 projects/*/logs/
 .env
+config/api_sources.yaml
+secrets/
+projects/*/secrets/
+*service-account*.json
+*credentials*.json
 ```
 
 提交前运行：
@@ -308,9 +354,10 @@ http://127.0.0.1:8000
 ```text
 1. 选择项目 default
 2. 把真实 CSV 放到 projects/default/data/raw/unity/、applovin/、ga4/
-3. 点击“运行真实日报流程”
-4. 打开 Tableau 刷新数据源
-5. 从 Tableau 手动导出 PDF 到 projects/default/reports/pdf/
-6. 点击“检查 PDF”
-7. 点击“邮件 Dry-run”
+3. 如需 GA4 API 拉数，先配置 config/api_sources.yaml，再点击“拉取 GA4 API”
+4. 点击“运行真实日报流程”
+5. 打开 Tableau 刷新数据源
+6. 从 Tableau 手动导出 PDF 到 projects/default/reports/pdf/
+7. 点击“检查 PDF”
+8. 点击“邮件 Dry-run”
 ```
