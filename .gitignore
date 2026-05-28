@@ -30,5 +30,26 @@ logs/*.log
 temp/**
 archive/**
 
+# Multi-project runtime outputs
+projects/*/data/raw/**
+projects/*/data/clean/**
+projects/*/data/mart/**
+projects/*/data/tableau_datasource/*.csv
+projects/*/ai/context/*.json
+projects/*/ai/draft/*.md
+projects/*/reports/pdf/**
+projects/*/reports/email/**
+projects/*/logs/*.log
+
+!projects/**/.gitkeep
+!projects/*/project.yaml
+!projects/*/data/raw/**/
+!projects/*/data/raw/**/.gitkeep
+!projects/*/data/clean/**/
+!projects/*/data/clean/**/.gitkeep
+!projects/*/data/tableau_datasource/.gitkeep
+!projects/*/ai/context/.gitkeep
+!projects/*/ai/draft/.gitkeep
+
 # Always allow .gitkeep files to be tracked
 !**/.gitkeep

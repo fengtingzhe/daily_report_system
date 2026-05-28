@@ -9,6 +9,7 @@ from __future__ import annotations
 import argparse
 import os
 import smtplib
+import sys
 from datetime import datetime
 from email.message import EmailMessage
 from pathlib import Path
@@ -17,6 +18,10 @@ from dotenv import load_dotenv
 
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(PROJECT_ROOT))
+
+from scripts.utils.project_paths import add_project_arg, ensure_project_dirs
+
 PDF_DIR = PROJECT_ROOT / "reports" / "pdf"
 ENV_PATH = PROJECT_ROOT / ".env"
 
@@ -81,15 +86,21 @@ def send_email(config: dict[str, str], msg: EmailMessage) -> None:
 def main() -> None:
     """主入口：默认 dry-run，--send 才真正发送。"""
     parser = argparse.ArgumentParser(description="Send latest report PDF by email.")
+    add_project_arg(parser)
     parser.add_argument("--send", action="store_true", help="Actually send the email.")
     args = parser.parse_args()
 
+    global PDF_DIR
+    paths = ensure_project_dirs(args.project)
+    PDF_DIR = paths["pdf_dir"]
+
     print("Report email sender")
+    print(f"Project: {paths['project_id']}")
     print("Mode:", "SEND" if args.send else "DRY-RUN")
 
     pdf_path = find_latest_pdf()
     if pdf_path is None:
-        print("No PDF found under reports/pdf/. Please export a PDF from Tableau first.")
+        print(f"No PDF found under {relative(PDF_DIR)}. Please export a PDF from Tableau first.")
         return
 
     print(f"Latest PDF: {relative(pdf_path)}")

@@ -9,14 +9,21 @@ imported_at 三个元信息字段。
 """
 
 import csv
+import argparse
 import re
+import sys
 from pathlib import Path
 from datetime import datetime
 
-# ============================================================
-# 路径常量
-# ============================================================
+
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(PROJECT_ROOT))
+
+from scripts.utils.project_paths import add_project_arg, ensure_project_dirs
+
+# ============================================================
+# 默认路径常量；main() 会根据 --project 覆盖。
+# ============================================================
 RAW_DIR = PROJECT_ROOT / "data" / "raw"
 CLEAN_DIR = PROJECT_ROOT / "data" / "clean"
 
@@ -183,8 +190,29 @@ def process_platform(platform: str, raw_platform_dir: Path, clean_platform_dir: 
     return result
 
 
+def parse_args() -> argparse.Namespace:
+    """解析命令行参数。"""
+    parser = argparse.ArgumentParser(description="Import raw CSV files into clean layer.")
+    add_project_arg(parser)
+    return parser.parse_args()
+
+
+def configure_paths(project_id: str | None) -> None:
+    """根据项目 ID 配置 raw/clean 路径。"""
+    global RAW_DIR, CLEAN_DIR
+    paths = ensure_project_dirs(project_id)
+    RAW_DIR = paths["raw_dir"]
+    CLEAN_DIR = paths["clean_dir"]
+    print(f"Project: {paths['project_id']}")
+    print(f"Raw dir: {RAW_DIR}")
+    print(f"Clean dir: {CLEAN_DIR}")
+
+
 def main() -> None:
     """主入口：遍历所有平台，导入原始 CSV 文件。"""
+    args = parse_args()
+    configure_paths(args.project)
+
     print("开始导入真实 CSV...")
     print()
 

@@ -11,17 +11,24 @@
 
 from __future__ import annotations
 
+import argparse
 import re
+import sys
 from pathlib import Path
 
 import pandas as pd
 import yaml
 
 
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(PROJECT_ROOT))
+
+from scripts.utils.project_paths import add_project_arg, ensure_project_dirs
+
+
 # ============================================================
 # 路径常量
 # ============================================================
-PROJECT_ROOT = Path(__file__).resolve().parent.parent
 CLEAN_DIR = PROJECT_ROOT / "data" / "clean"
 MART_DIR = PROJECT_ROOT / "data" / "mart"
 FIELD_MAPPING_PATH = PROJECT_ROOT / "config" / "field_mappings.yaml"
@@ -435,8 +442,29 @@ def write_empty_marts() -> None:
         write_mart(filename, pd.DataFrame(columns=columns))
 
 
+def parse_args() -> argparse.Namespace:
+    """解析命令行参数。"""
+    parser = argparse.ArgumentParser(description="Build mart CSV files from clean CSV files.")
+    add_project_arg(parser)
+    return parser.parse_args()
+
+
+def configure_paths(project_id: str | None) -> None:
+    """根据项目 ID 配置 clean/mart 路径。"""
+    global CLEAN_DIR, MART_DIR
+    paths = ensure_project_dirs(project_id)
+    CLEAN_DIR = paths["clean_dir"]
+    MART_DIR = paths["mart_dir"]
+    print(f"Project: {paths['project_id']}")
+    print(f"Clean dir: {CLEAN_DIR}")
+    print(f"Mart dir: {MART_DIR}")
+
+
 def main() -> None:
     """主入口：读取 clean CSV 并生成所有 mart 表。"""
+    args = parse_args()
+    configure_paths(args.project)
+
     print("开始构建 mart 数据...")
 
     mappings = load_field_mappings()

@@ -6,11 +6,17 @@
 
 from __future__ import annotations
 
+import argparse
+import sys
 from datetime import datetime
 from pathlib import Path
 
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(PROJECT_ROOT))
+
+from scripts.utils.project_paths import add_project_arg, ensure_project_dirs
+
 PDF_DIR = PROJECT_ROOT / "reports" / "pdf"
 
 
@@ -21,7 +27,16 @@ def relative(path: Path) -> str:
 
 def main() -> None:
     """查找最新 PDF 并打印信息。"""
+    parser = argparse.ArgumentParser(description="Check latest PDF output.")
+    add_project_arg(parser)
+    args = parser.parse_args()
+
+    global PDF_DIR
+    paths = ensure_project_dirs(args.project)
+    PDF_DIR = paths["pdf_dir"]
+
     print("Checking PDF output...")
+    print(f"Project: {paths['project_id']}")
     PDF_DIR.mkdir(parents=True, exist_ok=True)
 
     pdf_files = sorted(PDF_DIR.glob("*.pdf"), key=lambda p: p.stat().st_mtime, reverse=True)

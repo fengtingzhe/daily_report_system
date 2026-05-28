@@ -38,6 +38,22 @@ test_real_pipeline.bat
 
 ## 手动 CSV 输入目录
 
+新项目结构下，推荐把各平台手工导出的原始 CSV 放到项目目录：
+
+```text
+projects/default/data/raw/unity/
+projects/default/data/raw/applovin/
+projects/default/data/raw/ga4/
+```
+
+然后指定项目运行：
+
+```powershell
+py scripts\run_real_daily_report.py --project default
+```
+
+旧根目录输入目录仍保留给兼容和历史测试：
+
 把各平台手工导出的原始 CSV 放到：
 
 ```text
@@ -48,12 +64,82 @@ data/raw/ga4/
 
 `scripts/import_raw_csv.py` 会读取这些文件，清洗字段名并输出到 clean 层。
 
+## 可迁移与多项目
+
+本仓库现在采用“一套代码，多项目配置”的结构。不要为每个游戏复制一份完整代码仓库；多个游戏应放在同一个仓库的 `projects/<project_id>/` 下。
+
+项目目录示例：
+
+```text
+projects/default/
+projects/cash_game_a/
+```
+
+每个项目都有自己的数据、AI 输出、报告和 Tableau 目录：
+
+```text
+projects/default/data/raw/
+projects/default/data/clean/
+projects/default/data/mart/
+projects/default/data/tableau_datasource/
+projects/default/ai/context/
+projects/default/ai/draft/
+projects/default/reports/pdf/
+projects/default/reports/email/
+projects/default/tableau/
+projects/default/logs/
+```
+
+迁移到另一台电脑时：
+
+```text
+1. 复制代码仓库
+2. 安装 Python 依赖：python -m pip install -r requirements.txt
+3. 复制 .env.example 为 .env，并填写本机密钥和 SMTP 配置
+4. 复制或创建 projects/<project_id>/
+5. 运行 py scripts\list_projects.py 检查项目列表
+```
+
+列出项目：
+
+```powershell
+py scripts\list_projects.py
+```
+
+创建新项目：
+
+```powershell
+py scripts\init_project.py --project cash_game_a --name "网赚游戏 A"
+```
+
+把旧根目录中的 Tableau 测试模板和 AI 文件复制到 `projects/default`：
+
+```powershell
+py scripts\migrate_root_to_project.py --project default
+py scripts\migrate_root_to_project.py --project default --apply
+```
+
+第一条命令是 dry-run，只打印计划；第二条命令才真正复制。
+
+真实流程推荐使用项目参数：
+
+```powershell
+py scripts\run_real_daily_report.py --project default
+```
+
+`run_real_daily_report.bat` 默认运行 `--project default`。如果要运行其他项目，可以直接执行：
+
+```powershell
+py scripts\run_real_daily_report.py --project cash_game_a
+```
+
 ## 数据分层
 
 raw 层：
 
 ```text
 data/raw/
+projects/default/data/raw/
 ```
 
 存放平台原始 CSV，不提交到 Git。
@@ -62,6 +148,7 @@ clean 层：
 
 ```text
 data/clean/
+projects/default/data/clean/
 ```
 
 存放清洗后的平台 CSV，不提交到 Git。
@@ -70,6 +157,7 @@ mart 层：
 
 ```text
 data/mart/
+projects/default/data/mart/
 ```
 
 存放面向分析的聚合宽表，不提交到 Git。
@@ -78,6 +166,7 @@ Tableau 固定数据源：
 
 ```text
 data/tableau_datasource/
+projects/default/data/tableau_datasource/
 ```
 
 Tableau 模板读取这里的固定 CSV。`scripts/sync_mart_to_tableau_datasource.py` 会把 `data/mart/` 中的 mart 表同步到这里，但不会修改 `ai_report_text.csv`。
@@ -88,18 +177,21 @@ AI 上下文：
 
 ```text
 ai/context/daily_ai_context.json
+projects/default/ai/context/daily_ai_context.json
 ```
 
 日报草稿：
 
 ```text
 ai/draft/daily_report_draft.md
+projects/default/ai/draft/daily_report_draft.md
 ```
 
 Tableau 可读取的日报文字：
 
 ```text
 data/tableau_datasource/ai_report_text.csv
+projects/default/data/tableau_datasource/ai_report_text.csv
 ```
 
 DeepSeek 默认关闭。需要使用时，复制 `.env.example` 为 `.env`，填写 `DEEPSEEK_API_KEY`，并在 `config/ai_report.yaml` 中设置：
@@ -116,12 +208,14 @@ use_deepseek: true
 
 ```text
 reports/pdf/
+projects/default/reports/pdf/
 ```
 
 检查最新 PDF：
 
 ```powershell
 py scripts\check_pdf_output.py
+py scripts\check_pdf_output.py --project default
 ```
 
 `scripts/export_tableau_pdf.py` 是可选占位脚本，默认不自动导出。
@@ -132,12 +226,14 @@ py scripts\check_pdf_output.py
 
 ```powershell
 py scripts\send_report_email.py
+py scripts\send_report_email.py --project default
 ```
 
 确认 `.env` 中 SMTP 配置完整后，才使用：
 
 ```powershell
 py scripts\send_report_email.py --send
+py scripts\send_report_email.py --project default --send
 ```
 
 ## API 拉数骨架
@@ -166,8 +262,14 @@ config/api_sources.example.yaml
 data/raw/
 data/clean/
 data/mart/
+projects/*/data/raw/
+projects/*/data/clean/
+projects/*/data/mart/
+projects/*/data/tableau_datasource/*.csv
 reports/pdf/
+projects/*/reports/pdf/
 logs/
+projects/*/logs/
 .env
 ```
 

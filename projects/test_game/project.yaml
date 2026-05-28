@@ -1,0 +1,5 @@
+project_id: test_game
+project_name: 测试游戏
+timezone: Asia/Shanghai
+currency: USD
+tableau_workbook: ''

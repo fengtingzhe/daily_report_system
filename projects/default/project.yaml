@@ -1,0 +1,5 @@
+project_id: default
+project_name: 项目A
+timezone: Asia/Shanghai
+currency: USD
+tableau_workbook: ""

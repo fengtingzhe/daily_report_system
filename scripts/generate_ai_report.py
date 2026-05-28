@@ -8,9 +8,11 @@ AI 日报草稿生成脚本。
 
 from __future__ import annotations
 
+import argparse
 import csv
 import json
 import re
+import sys
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -24,6 +26,10 @@ from dotenv import load_dotenv
 # 路径常量
 # ============================================================
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(PROJECT_ROOT))
+
+from scripts.utils.project_paths import add_project_arg, ensure_project_dirs
+
 CONTEXT_PATH = PROJECT_ROOT / "ai" / "context" / "daily_ai_context.json"
 MARKDOWN_OUTPUT = PROJECT_ROOT / "ai" / "draft" / "daily_report_draft.md"
 TABLEAU_CSV = PROJECT_ROOT / "data" / "tableau_datasource" / "ai_report_text.csv"
@@ -299,8 +305,35 @@ def write_tableau_text_csv(sections: dict[str, str], ctx: dict[str, Any]) -> Non
             })
 
 
+def parse_args() -> argparse.Namespace:
+    """解析命令行参数。"""
+    parser = argparse.ArgumentParser(description="Generate AI report draft and Tableau text CSV.")
+    add_project_arg(parser)
+    return parser.parse_args()
+
+
+def configure_paths(project_id: str | None) -> None:
+    """根据项目 ID 配置 AI 输入输出路径。"""
+    global CONTEXT_PATH, MARKDOWN_OUTPUT, TABLEAU_CSV
+    if "--project" not in sys.argv:
+        print("Project: legacy-root (no --project provided)")
+        return
+
+    paths = ensure_project_dirs(project_id)
+    CONTEXT_PATH = paths["ai_context_dir"] / "daily_ai_context.json"
+    MARKDOWN_OUTPUT = paths["ai_draft_dir"] / "daily_report_draft.md"
+    TABLEAU_CSV = paths["tableau_datasource_dir"] / "ai_report_text.csv"
+    print(f"Project: {paths['project_id']}")
+    print(f"AI context: {CONTEXT_PATH}")
+    print(f"AI draft: {MARKDOWN_OUTPUT}")
+    print(f"Tableau text CSV: {TABLEAU_CSV}")
+
+
 def main() -> None:
     """主入口：生成 AI 日报草稿和 Tableau 文本 CSV。"""
+    args = parse_args()
+    configure_paths(args.project)
+
     print("开始生成日报草稿...")
     print("  [1/3] 加载 daily_ai_context.json ...")
     ctx = load_context()

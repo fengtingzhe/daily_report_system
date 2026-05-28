@@ -8,12 +8,18 @@
 
 from __future__ import annotations
 
+import argparse
+import sys
 from pathlib import Path
 
 import pandas as pd
 
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(PROJECT_ROOT))
+
+from scripts.utils.project_paths import add_project_arg, ensure_project_dirs
+
 MART_DIR = PROJECT_ROOT / "data" / "mart"
 TABLEAU_DIR = PROJECT_ROOT / "data" / "tableau_datasource"
 
@@ -54,8 +60,29 @@ def sync_one(filename: str) -> bool:
     return True
 
 
+def parse_args() -> argparse.Namespace:
+    """解析命令行参数。"""
+    parser = argparse.ArgumentParser(description="Sync mart CSV files to Tableau datasource.")
+    add_project_arg(parser)
+    return parser.parse_args()
+
+
+def configure_paths(project_id: str | None) -> None:
+    """根据项目 ID 配置 mart/Tableau 数据源路径。"""
+    global MART_DIR, TABLEAU_DIR
+    paths = ensure_project_dirs(project_id)
+    MART_DIR = paths["mart_dir"]
+    TABLEAU_DIR = paths["tableau_datasource_dir"]
+    print(f"Project: {paths['project_id']}")
+    print(f"Mart dir: {MART_DIR}")
+    print(f"Tableau datasource dir: {TABLEAU_DIR}")
+
+
 def main() -> None:
     """主入口：同步所有已支持的 mart 文件。"""
+    args = parse_args()
+    configure_paths(args.project)
+
     print("Start syncing mart CSV files to Tableau datasource...")
     print("ai_report_text.csv will not be modified by this script.")
 
