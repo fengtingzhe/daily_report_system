@@ -65,6 +65,15 @@ new_users:
   - new users
   - first_open
 
+payers:
+  - payers
+  - paying_users
+  - purchasers
+  - total_purchasers
+  - active_payers
+  - paying_user_count
+  - 付费人数
+
 impressions:
   - impressions
   - ad_impressions
@@ -127,6 +136,25 @@ install_date:
   - install_date
   - cohort_date
   - install day
+
+# 真实 cohort 留存计算所需（可选）：每行表示某安装日的群组在第 N 天的留存人数。
+days_since_install:
+  - days_since_install
+  - day_n
+  - day_index
+  - nth_day
+  - days_after_install
+
+retained_users:
+  - retained_users
+  - active_users_in_cohort
+  - returning_users
+  - retained
+
+cohort_size:
+  - cohort_size
+  - cohort_new_users
+  - install_cohort_size
 
 d1_retention:
   - d1_retention

@@ -4,9 +4,11 @@
 方便在 Tableau 中搭建第一个 Dashboard。
 """
 
+import argparse
 import csv
 import random
 import math
+import sys
 from pathlib import Path
 from datetime import datetime, timedelta
 
@@ -14,6 +16,10 @@ from datetime import datetime, timedelta
 # 项目根目录与输出目录
 # ============================================================
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(PROJECT_ROOT))
+
+from scripts.utils.project_paths import add_project_arg, ensure_project_dirs, load_project_config
+
 TABLEAU_DIR = PROJECT_ROOT / "data" / "tableau_datasource"
 
 # ============================================================
@@ -88,7 +94,8 @@ def build_daily_overview(dates: list[str]) -> tuple[list[str], list[dict]]:
     header = [
         "date", "project", "dau", "new_users", "revenue",
         "ad_revenue", "iap_revenue", "arpdau", "ecpm",
-        "impressions", "impressions_per_dau", "d1_retention", "d7_retention",
+        "impressions", "impressions_per_dau", "payers", "payment_rate", "arppu",
+        "d1_retention", "d7_retention",
     ]
     rows = []
     for i, d in enumerate(dates):
@@ -101,6 +108,9 @@ def build_daily_overview(dates: list[str]) -> tuple[list[str], list[dict]]:
         impressions = int(dau * random.uniform(3.2, 5.5))
         impressions_per_dau = round(impressions / dau, 2) if dau > 0 else 0
         ecpm = round((ad_revenue / impressions) * 1000, 2) if impressions > 0 else 0
+        payers = int(dau * random.uniform(0.012, 0.025))
+        payment_rate = round(payers / dau, 4) if dau > 0 else 0
+        arppu = round(iap_revenue / payers, 2) if payers > 0 else 0
         d1_ret = round(random.uniform(0.32, 0.38), 4)
         d7_ret = round(random.uniform(0.10, 0.15), 4)
 
@@ -116,6 +126,9 @@ def build_daily_overview(dates: list[str]) -> tuple[list[str], list[dict]]:
             "ecpm": ecpm,
             "impressions": impressions,
             "impressions_per_dau": impressions_per_dau,
+            "payers": payers,
+            "payment_rate": payment_rate,
+            "arppu": arppu,
             "d1_retention": d1_ret,
             "d7_retention": d7_ret,
         })
@@ -345,6 +358,19 @@ def build_ai_report_text(dates: list[str]) -> tuple[list[str], list[dict]]:
 
 def main() -> None:
     """主入口：生成所有 Tableau 固定数据源的测试数据。"""
+    global TABLEAU_DIR, PROJECT_NAME
+
+    parser = argparse.ArgumentParser(description="Generate Tableau test data.")
+    add_project_arg(parser)
+    # 测试数据默认写入隔离的 demo 项目，避免污染真实项目
+    parser.set_defaults(project="demo")
+    args = parser.parse_args()
+
+    paths = ensure_project_dirs(args.project)
+    TABLEAU_DIR = paths["tableau_datasource_dir"]
+    PROJECT_NAME = str(load_project_config(args.project).get("project_name", PROJECT_NAME))
+
+    print(f"Project: {args.project}")
     print("开始生成 Tableau 测试数据...")
 
     dates = build_dates(days=14)

@@ -315,10 +315,6 @@ def parse_args() -> argparse.Namespace:
 def configure_paths(project_id: str | None) -> None:
     """根据项目 ID 配置 AI 输入输出路径。"""
     global CONTEXT_PATH, MARKDOWN_OUTPUT, TABLEAU_CSV
-    if "--project" not in sys.argv:
-        print("Project: legacy-root (no --project provided)")
-        return
-
     paths = ensure_project_dirs(project_id)
     CONTEXT_PATH = paths["ai_context_dir"] / "daily_ai_context.json"
     MARKDOWN_OUTPUT = paths["ai_draft_dir"] / "daily_report_draft.md"

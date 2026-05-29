@@ -24,6 +24,16 @@ if not errorlevel 1 goto open_browser
 echo Web console is not running. Starting server...
 echo.
 
+set "VENV_PY=%~dp0.venv\Scripts\python.exe"
+echo Trying venv Python: %VENV_PY%
+if exist "%VENV_PY%" (
+    start "Daily Report Web Console" "%VENV_PY%" "%SCRIPT%"
+    goto wait_for_server
+) else (
+    echo SKIP: .venv not found. Run setup.bat to create it.
+)
+echo.
+
 echo Trying Python launcher: py
 where py >nul 2>nul
 if errorlevel 1 (

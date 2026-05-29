@@ -23,7 +23,7 @@ import yaml
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
-from scripts.utils.project_paths import add_project_arg, ensure_project_dirs
+from scripts.utils.project_paths import add_project_arg, ensure_project_dirs, load_project_config
 
 
 # ============================================================
@@ -41,7 +41,8 @@ MART_SCHEMAS: dict[str, list[str]] = {
     "mart_daily_overview.csv": [
         "date", "project", "dau", "new_users", "revenue", "ad_revenue",
         "iap_revenue", "arpdau", "ecpm", "impressions",
-        "impressions_per_dau", "d1_retention", "d7_retention",
+        "impressions_per_dau", "payers", "payment_rate", "arppu",
+        "d1_retention", "d7_retention",
     ],
     "mart_country_daily.csv": [
         "date", "project", "country", "platform", "dau", "new_users",
@@ -75,16 +76,19 @@ MART_SCHEMAS: dict[str, list[str]] = {
 
 NUMERIC_FIELDS = {
     "dau", "new_users", "revenue", "ad_revenue", "iap_revenue",
-    "impressions", "ecpm", "spend", "installs", "d1_retention",
+    "impressions", "ecpm", "spend", "installs", "payers", "d1_retention",
     "d3_retention", "d7_retention", "d14_retention", "d30_retention",
 }
 
-INTEGER_FIELDS = {"dau", "new_users", "impressions", "installs"}
-MONEY_FIELDS = {"revenue", "ad_revenue", "iap_revenue", "spend", "ecpm"}
+INTEGER_FIELDS = {"dau", "new_users", "impressions", "installs", "payers"}
+MONEY_FIELDS = {"revenue", "ad_revenue", "iap_revenue", "spend", "ecpm", "arppu"}
 RATIO_FIELDS = {
-    "arpdau", "impressions_per_dau", "cpi", "d0_roas", "d1_roas", "d7_roas",
+    "arpdau", "impressions_per_dau", "payment_rate", "cpi", "d0_roas", "d1_roas", "d7_roas",
     "d1_retention", "d3_retention", "d7_retention", "d14_retention", "d30_retention",
 }
+
+# 留存等比例字段：聚合时按 new_users 加权平均，而不是简单取均值。
+RETENTION_FIELDS = ["d1_retention", "d3_retention", "d7_retention", "d14_retention", "d30_retention"]
 
 TEXT_DEFAULTS = {
     "project": "项目A",
@@ -274,6 +278,12 @@ def prepare_standard_frame(
         install_dates = pd.to_datetime(df[install_date_column], errors="coerce")
         output["install_date"] = install_dates.dt.strftime("%Y-%m-%d").fillna(output["date"])
 
+    # 真实 cohort 留存输入（可选）：days_since_install / retained_users / cohort_size。
+    for cohort_field in ("days_since_install", "retained_users", "cohort_size"):
+        series = get_optional_number_series(df, cohort_field, mappings)
+        if series is not None:
+            output[cohort_field] = series
+
     for field in NUMERIC_FIELDS:
         output[field] = get_number_series(
             df,
@@ -306,30 +316,45 @@ def safe_divide(numerator: pd.Series, denominator: pd.Series, scale: float = 1.0
     return result.round(4)
 
 
-def weighted_or_mean(grouped: pd.core.groupby.DataFrameGroupBy, column: str) -> pd.Series:
-    """留存等比例字段先取均值；未来可扩展为按 new_users 加权。"""
-    return grouped[column].mean().fillna(0)
+def aggregate_with_retention(
+    df: pd.DataFrame,
+    dimensions: list[str],
+    sum_fields: list[str],
+    retention_fields: list[str],
+) -> pd.DataFrame:
+    """按维度聚合：sum 字段求和，留存比例字段按 new_users 加权平均。
+
+    加权平均比简单取均值更正确：合并多平台/多国家时，留存应按各自的新增用户量加权，
+    否则小盘口国家会被等权放大。缺少 new_users 时回退为简单均值。
+    """
+    work = df.copy()
+    has_weight = "new_users" in work.columns
+    present_ret = [c for c in retention_fields if c in work.columns]
+    for col in present_ret:
+        weight = work["new_users"] if has_weight else pd.Series([1.0] * len(work), index=work.index)
+        work[col + "__num"] = work[col] * weight
+        work[col + "__den"] = weight.where(work[col].notna(), other=0.0)
+
+    agg_map: dict[str, str] = {field: "sum" for field in sum_fields if field in work.columns}
+    for col in present_ret:
+        agg_map[col + "__num"] = "sum"
+        agg_map[col + "__den"] = "sum"
+
+    grouped = work.groupby(dimensions, as_index=False, dropna=False).agg(agg_map)
+
+    for col in present_ret:
+        grouped[col] = safe_divide(grouped[col + "__num"], grouped[col + "__den"])
+        grouped = grouped.drop(columns=[col + "__num", col + "__den"])
+    return grouped
 
 
 def aggregate_base(df: pd.DataFrame, dimensions: list[str]) -> pd.DataFrame:
-    """通用聚合：按维度汇总常见数值字段。"""
-    grouped = df.groupby(dimensions, as_index=False, dropna=False)
-    agg = grouped.agg({
-        "dau": "sum",
-        "new_users": "sum",
-        "revenue": "sum",
-        "ad_revenue": "sum",
-        "iap_revenue": "sum",
-        "impressions": "sum",
-        "spend": "sum",
-        "installs": "sum",
-        "d1_retention": "mean",
-        "d3_retention": "mean",
-        "d7_retention": "mean",
-        "d14_retention": "mean",
-        "d30_retention": "mean",
-    })
-    return agg
+    """通用聚合：按维度汇总常见数值字段（留存按 new_users 加权）。"""
+    sum_fields = [
+        "dau", "new_users", "revenue", "ad_revenue", "iap_revenue",
+        "impressions", "spend", "installs", "payers",
+    ]
+    return aggregate_with_retention(df, dimensions, sum_fields, RETENTION_FIELDS)
 
 
 def build_daily_overview(df: pd.DataFrame) -> pd.DataFrame:
@@ -339,6 +364,9 @@ def build_daily_overview(df: pd.DataFrame) -> pd.DataFrame:
     mart["arpdau"] = safe_divide(mart["revenue"], mart["dau"])
     mart["ecpm"] = safe_divide(mart["ad_revenue"], mart["impressions"], scale=1000)
     mart["impressions_per_dau"] = safe_divide(mart["impressions"], mart["dau"])
+    # 付费率 = 付费人数 / DAU；ARPPU = IAP 收入 / 付费人数
+    mart["payment_rate"] = safe_divide(mart["payers"], mart["dau"])
+    mart["arppu"] = safe_divide(mart["iap_revenue"], mart["payers"])
     return mart[MART_SCHEMAS["mart_daily_overview.csv"]]
 
 
@@ -386,30 +414,91 @@ def build_campaign_daily(df: pd.DataFrame) -> pd.DataFrame:
     return mart[MART_SCHEMAS["mart_campaign_daily.csv"]]
 
 
+RETENTION_DAY_TARGETS = {
+    "d1_retention": 1,
+    "d3_retention": 3,
+    "d7_retention": 7,
+    "d14_retention": 14,
+    "d30_retention": 30,
+}
+
+
+def has_cohort_input(df: pd.DataFrame) -> bool:
+    """判断 clean 数据是否携带真实 cohort 留存输入。"""
+    needed = {"days_since_install", "retained_users"}
+    if not needed.issubset(df.columns):
+        return False
+    return bool((df["days_since_install"] > 0).any() and (df["retained_users"] > 0).any())
+
+
+def build_retention_from_cohort(df: pd.DataFrame) -> pd.DataFrame:
+    """从真实 cohort 明细计算留存率。
+
+    输入契约（每行一条 cohort×第 N 天记录）：
+      install_date         安装日（群组日期）
+      days_since_install   距安装天数（0=安装当天，1=次日……）
+      retained_users       该群组在第 N 天仍活跃的人数
+      cohort_size          群组规模（可选；缺失时用 days_since_install=0 的 retained_users 推断）
+      platform/country/channel 维度
+
+    留存率 = retained_users(第 N 天) / cohort_size。
+    """
+    dimensions = ["project", "install_date", "platform", "country", "channel"]
+    work = df[df["retained_users"].notna()].copy()
+    work["days_since_install"] = work["days_since_install"].fillna(0)
+    if work.empty:
+        return pd.DataFrame(columns=MART_SCHEMAS["mart_retention_daily.csv"])
+
+    # 群组规模：优先用显式 cohort_size，否则取该群组第 0 天的 retained_users。
+    if "cohort_size" in work.columns and (work["cohort_size"] > 0).any():
+        size = work.groupby(dimensions, dropna=False)["cohort_size"].max()
+    else:
+        day0 = work[work["days_since_install"] == 0]
+        size = day0.groupby(dimensions, dropna=False)["retained_users"].sum()
+    size = size.rename("cohort_size")
+
+    records: dict[tuple, dict] = {}
+    grouped_by_day = work.groupby(dimensions + ["days_since_install"], dropna=False)["retained_users"].sum()
+    for index_tuple, retained in grouped_by_day.items():
+        keys = tuple(index_tuple[:-1])
+        day = index_tuple[-1]
+        records.setdefault(keys, {})[int(day)] = retained
+
+    rows: list[dict] = []
+    for keys, by_day in records.items():
+        base = dict(zip(dimensions, keys))
+        cohort_size = float(size.get(keys, 0) or 0)
+        row = dict(base)
+        row["date"] = base["install_date"]
+        row["new_users"] = int(round(cohort_size))
+        for field, day_n in RETENTION_DAY_TARGETS.items():
+            retained = float(by_day.get(day_n, 0) or 0)
+            row[field] = round(retained / cohort_size, 4) if cohort_size > 0 else 0.0
+        rows.append(row)
+
+    mart = pd.DataFrame(rows)
+    if mart.empty:
+        return pd.DataFrame(columns=MART_SCHEMAS["mart_retention_daily.csv"])
+    return mart[MART_SCHEMAS["mart_retention_daily.csv"]]
+
+
 def build_retention_daily(df: pd.DataFrame) -> pd.DataFrame:
-    """构建留存 cohort mart。"""
+    """构建留存 cohort mart：有真实 cohort 明细时算真实留存，否则按 new_users 加权聚合既有留存列。"""
+    if has_cohort_input(df):
+        print("检测到 cohort 留存明细，按 retained_users/cohort_size 计算真实留存。")
+        return build_retention_from_cohort(df)
+
     dimensions = ["date", "project", "install_date", "platform", "country", "channel"]
-    mart = df.groupby(dimensions, as_index=False, dropna=False).agg({
-        "new_users": "sum",
-        "d1_retention": "mean",
-        "d3_retention": "mean",
-        "d7_retention": "mean",
-        "d14_retention": "mean",
-        "d30_retention": "mean",
-    })
+    mart = aggregate_with_retention(df, dimensions, ["new_users"], RETENTION_FIELDS)
     return mart[MART_SCHEMAS["mart_retention_daily.csv"]]
 
 
 def build_version_daily(df: pd.DataFrame) -> pd.DataFrame:
-    """构建版本日 mart。"""
+    """构建版本日 mart（留存按 new_users 加权）。"""
     dimensions = ["date", "project", "version", "platform"]
-    mart = df.groupby(dimensions, as_index=False, dropna=False).agg({
-        "dau": "sum",
-        "new_users": "sum",
-        "revenue": "sum",
-        "d1_retention": "mean",
-        "d7_retention": "mean",
-    })
+    mart = aggregate_with_retention(
+        df, dimensions, ["dau", "new_users", "revenue"], ["d1_retention", "d7_retention"]
+    )
     return mart[MART_SCHEMAS["mart_version_daily.csv"]]
 
 
@@ -455,7 +544,14 @@ def configure_paths(project_id: str | None) -> None:
     paths = ensure_project_dirs(project_id)
     CLEAN_DIR = paths["clean_dir"]
     MART_DIR = paths["mart_dir"]
+
+    # 用项目配置中的 project_name 作为 mart 的项目列默认值，避免写死“项目A”
+    project_name = str(load_project_config(project_id).get("project_name", "")).strip()
+    if project_name:
+        TEXT_DEFAULTS["project"] = project_name
+
     print(f"Project: {paths['project_id']}")
+    print(f"Project name: {TEXT_DEFAULTS['project']}")
     print(f"Clean dir: {CLEAN_DIR}")
     print(f"Mart dir: {MART_DIR}")
 

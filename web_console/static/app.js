@@ -10,6 +10,14 @@ let currentStatus = null;
 let isRunning = false;
 let taskHistory = [];
 
+function escapeHtml(value) {
+  return String(value == null ? "" : value)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
 const stepLabels = {
   fetch_ga4_api: "拉取 GA4 API",
   import_raw_csv: "导入原始 CSV",
@@ -41,6 +49,7 @@ const KPI_DEFS = [
   { key: "new_users", label: "新增用户" },
   { key: "arpdau", label: "ARPDAU" },
   { key: "ecpm", label: "eCPM" },
+  { key: "payment_rate", label: "付费率" },
   { key: "d1_retention", label: "次日留存" },
 ];
 
@@ -142,6 +151,7 @@ function setQuickStatus(state, label) {
 
 function setRunStatus(state, label) {
   setBadge("runStatus", state, label);
+  setBadge("runStatusInline", state, label);
 }
 
 // ===================================================================
@@ -184,12 +194,22 @@ function renderTaskList() {
 function setStepState(elementId, state) {
   var el = document.getElementById(elementId);
   if (!el) return;
-  el.classList.remove("done", "fail");
+  el.classList.remove("done", "fail", "running");
   var idx = el.querySelector(".step-index");
-  var num = el.querySelector(".step-index").getAttribute("data-num");
-  if (state === "done") { el.classList.add("done"); idx.textContent = "✓"; }
-  else if (state === "fail") { el.classList.add("fail"); idx.textContent = "!"; }
+  var num = idx ? idx.getAttribute("data-num") : "";
+  if (state === "done") { el.classList.add("done"); if (idx) idx.textContent = "✓"; }
+  else if (state === "fail") { el.classList.add("fail"); if (idx) idx.textContent = "!"; }
+  else if (state === "running") { el.classList.add("running"); if (idx) idx.textContent = "…"; }
   else if (idx) { idx.textContent = num; }
+}
+
+function setStepRunning(step) {
+  if (step === "run_real_pipeline") {
+    allStepElements.forEach(function (id) { setStepState(id, "running"); });
+    return;
+  }
+  var target = stepElement[step];
+  if (target) setStepState(target, "running");
 }
 
 function initStepNumbers() {
@@ -218,6 +238,10 @@ function navigateTo(pageName) {
   document.querySelectorAll(".sidebar-item").forEach(function (item) {
     item.classList.toggle("active", item.getAttribute("data-page") === pageName);
   });
+  if (pageName === "settings" && !settingsLoaded) {
+    settingsLoaded = true;
+    loadAllSettings();
+  }
 }
 
 function switchTab(group, tabName) {
@@ -245,53 +269,92 @@ function setButtonsDisabled(disabled) {
 // Run step
 // ===================================================================
 
-function setOutput(result) {
-  setText("lastCommand", result.command || "-");
-  setText("lastReturnCode", String(result.returncode == null ? "-" : result.returncode));
-
+function appendLog(line) {
   var out = document.getElementById("stdoutBox");
-  if (out) { out.textContent = result.stdout || "-"; out.classList.remove("muted"); }
-  var err = document.getElementById("stderrBox");
-  if (err) { err.textContent = result.stderr || "-"; err.classList.toggle("muted", !result.stderr); }
+  if (!out) return;
+  out.textContent += (out.textContent ? "\n" : "") + line;
+  out.scrollTop = out.scrollHeight;
+}
 
+function finalizeRun(result) {
+  setButtonsDisabled(false);
+  setText("lastReturnCode", String(result.returncode == null ? "-" : result.returncode));
   var label = stepLabels[result.step] || result.step;
+  var secs = result.duration_seconds == null ? 0 : result.duration_seconds;
+
   if (result.ok) {
-    setRunStatus("ok", "成功 · " + (result.duration_seconds || 0) + "s");
-    setQuickStatus("success", "上一步成功：" + label + " · " + (result.duration_seconds || 0) + "s");
+    setRunStatus("ok", "成功 · " + secs + "s");
+    setQuickStatus("success", "上一步成功：" + label + " · " + secs + "s");
     showToast(label + " 成功", true);
   } else {
-    setRunStatus("fail", "失败 · " + (result.duration_seconds || 0) + "s");
+    setRunStatus("fail", "失败 · " + secs + "s");
     setQuickStatus("fail", "上一步失败：" + label);
     showToast(label + " 失败", false);
   }
 
-  addTaskEntry(result);
+  addTaskEntry({ step: result.step, ok: result.ok, duration_seconds: secs });
   markStepFromResult(result);
+  refreshStatus();
+  refreshKpis();
 }
 
-async function runStep(step) {
+// Live streaming run via Server-Sent Events.
+function runStep(step) {
   if (isRunning) return;
   setButtonsDisabled(true);
   setRunStatus("running", "运行中…");
   setQuickStatus("running", "运行中：" + (stepLabels[step] || step));
+  setStepRunning(step);
   setText("lastCommand", stepLabels[step] || step);
   setText("lastReturnCode", "-");
-  var out = document.getElementById("stdoutBox");
-  if (out) { out.textContent = "Running…"; out.classList.remove("muted"); }
 
-  try {
-    var result = await apiJson("/api/run-step", {
-      method: "POST",
-      body: JSON.stringify({ project: selectedProject(), step: step }),
-    });
-    setOutput(result);
-    await refreshStatus();
-    await refreshKpis();
-  } catch (error) {
-    setOutput({ ok: false, step: step, command: step, returncode: "-", stdout: "", stderr: error.message, duration_seconds: 0 });
-  } finally {
+  var out = document.getElementById("stdoutBox");
+  if (out) { out.textContent = ""; out.classList.remove("muted"); }
+
+  var url = "/api/run-stream?project=" + encodeURIComponent(selectedProject()) +
+    "&step=" + encodeURIComponent(step);
+  var es = new EventSource(url);
+  es._done = false;
+
+  es.addEventListener("start", function (e) {
+    try { var d = JSON.parse(e.data); if (d.command) setText("lastCommand", d.command); } catch (x) {}
+  });
+
+  es.addEventListener("log", function (e) {
+    try { appendLog(JSON.parse(e.data).line); } catch (x) {}
+  });
+
+  // Server-side busy/precondition message (distinct from native connection error).
+  es.addEventListener("busy", function (e) {
+    var msg = "已有任务正在运行，请稍候。";
+    try { if (e.data) msg = JSON.parse(e.data).message || msg; } catch (x) {}
+    es._done = true;
+    es.close();
+    appendLog("[提示] " + msg);
+    showToast(msg, false);
     setButtonsDisabled(false);
-  }
+    setRunStatus("idle", "空闲");
+    setQuickStatus("idle", "就绪");
+    setStepState(stepElement[step] || "", "");
+  });
+
+  es.addEventListener("done", function (e) {
+    es._done = true;
+    es.close();
+    var d = { ok: false, step: step, returncode: "-", duration_seconds: 0 };
+    try { d = JSON.parse(e.data); } catch (x) {}
+    if (d.error) appendLog("[错误] " + d.error);
+    finalizeRun(d);
+  });
+
+  // Native EventSource error (connection dropped). Ignore if we already finished.
+  es.onerror = function () {
+    if (es._done) return;
+    es._done = true;
+    es.close();
+    appendLog("[错误] 与服务器的连接中断。");
+    finalizeRun({ ok: false, step: step, returncode: "-", duration_seconds: 0 });
+  };
 }
 
 // ===================================================================
@@ -339,12 +402,33 @@ function formatKpi(key, value) {
       return Math.round(Number(value)).toLocaleString("en-US");
     case "d1_retention":
       return (Number(value) * 100).toFixed(1) + "%";
+    case "payment_rate":
+      return (Number(value) * 100).toFixed(2) + "%";
     default:
       return String(value);
   }
 }
 
-function renderKpiCards(metrics) {
+function buildSparkline(values) {
+  if (!values || values.length < 2) return "";
+  var w = 132, h = 30, pad = 2;
+  var min = Math.min.apply(null, values);
+  var max = Math.max.apply(null, values);
+  var range = max - min || 1;
+  var n = values.length;
+  function px(i) { return pad + (i * (w - 2 * pad)) / (n - 1); }
+  function py(v) { return h - pad - ((v - min) / range) * (h - 2 * pad); }
+  var pts = values.map(function (v, i) { return px(i).toFixed(1) + "," + py(v).toFixed(1); });
+  var cls = values[n - 1] >= values[0] ? "up" : "down";
+  return (
+    '<svg class="kpi-spark ' + cls + '" viewBox="0 0 ' + w + ' ' + h + '" preserveAspectRatio="none">' +
+    '<polyline points="' + pts.join(" ") + '" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round" />' +
+    '<circle cx="' + px(n - 1).toFixed(1) + '" cy="' + py(values[n - 1]).toFixed(1) + '" r="2" fill="currentColor" />' +
+    "</svg>"
+  );
+}
+
+function renderKpiCards(metrics, series) {
   var grid = document.getElementById("kpiGrid");
   if (!grid) return;
   grid.innerHTML = metrics.map(function (m) {
@@ -358,11 +442,13 @@ function renderKpiCards(metrics) {
     } else {
       deltaHtml = '<span class="kpi-delta flat">– 0.0%</span>';
     }
+    var spark = series && series[m.key] ? buildSparkline(series[m.key]) : "";
     return (
       '<div class="kpi-card">' +
       '<span class="kpi-label">' + m.label + "</span>" +
       '<span class="kpi-value">' + (m.value == null ? "-" : formatKpi(m.key, m.value)) + "</span>" +
-      deltaHtml + "</div>"
+      '<div class="kpi-foot">' + deltaHtml + spark + "</div>" +
+      "</div>"
     );
   }).join("");
 }
@@ -383,10 +469,49 @@ function renderKpiEmpty(message) {
 async function refreshKpis() {
   try {
     var data = await apiJson("/api/kpi?project=" + encodeURIComponent(selectedProject()));
-    if (data.ok && data.metrics && data.metrics.length) renderKpiCards(data.metrics);
-    else renderKpiEmpty("运行流程后生成");
+    if (data.ok && data.metrics && data.metrics.length) {
+      var series = {};
+      try {
+        var s = await apiJson("/api/kpi-series?project=" + encodeURIComponent(selectedProject()));
+        if (s.ok) series = s.series;
+      } catch (e) { /* sparkline optional */ }
+      renderKpiCards(data.metrics, series);
+    } else {
+      renderKpiEmpty("运行流程后生成");
+    }
   } catch (e) {
     renderKpiEmpty("加载失败");
+  }
+  refreshAlerts();
+}
+
+var ALERT_LABELS = {
+  revenue: "收入", dau: "DAU", ecpm: "eCPM",
+  payment_rate: "付费率", d1_retention: "次日留存", d7_retention: "7 日留存",
+};
+
+async function refreshAlerts() {
+  var banner = document.getElementById("alertBanner");
+  if (!banner) return;
+  try {
+    var data = await apiJson("/api/alerts?project=" + encodeURIComponent(selectedProject()));
+    var alerts = (data && data.alerts) || [];
+    if (!data.ok || !alerts.length) {
+      banner.hidden = true;
+      banner.innerHTML = "";
+      return;
+    }
+    var items = alerts.map(function (a) {
+      var label = ALERT_LABELS[a.metric] || a.metric;
+      return '<li><span class="alert-metric">' + label + "</span>" + escapeHtml(a.message) + "</li>";
+    }).join("");
+    banner.innerHTML =
+      '<div class="alert-head">⚠ 异常告警 · ' + escapeHtml(data.report_date || "") +
+      ' <span class="alert-count">' + alerts.length + " 项</span></div>" +
+      "<ul class=\"alert-list\">" + items + "</ul>";
+    banner.hidden = false;
+  } catch (e) {
+    banner.hidden = true;
   }
 }
 
@@ -402,9 +527,8 @@ function updateProjectMeta() {
   var pn = project ? project.project_name : null;
   if (!pn && currentStatus) pn = currentStatus.project_name;
 
-  setText("settingsProjectName", pn || "-");
-  setText("settingsProjectPath", project ? project.path : "projects/" + selectedProject());
-  setText("settingsProjectId", selectedProject());
+  setVal("settingsProjectPath", project ? project.path : "projects/" + selectedProject());
+  setVal("settingsProjectId", selectedProject());
 
   setText("sidebarProjectName", pn || "未命名项目");
   setText("sidebarProjectId", selectedProject());
@@ -641,6 +765,283 @@ async function fetchGa4WithSave() {
 }
 
 // ===================================================================
+// Config center (Settings forms)
+// ===================================================================
+
+let settingsLoaded = false;
+
+function setVal(id, value) {
+  var el = document.getElementById(id);
+  if (el) el.value = value == null ? "" : value;
+}
+function getVal(id) {
+  var el = document.getElementById(id);
+  return el ? el.value.trim() : "";
+}
+function getChecked(id) {
+  var el = document.getElementById(id);
+  return el ? !!el.checked : false;
+}
+function setChecked(id, value) {
+  var el = document.getElementById(id);
+  if (el) el.checked = !!value;
+}
+function setCfgMsg(id, ok, text) {
+  var el = document.getElementById(id);
+  if (!el) return;
+  el.textContent = text;
+  el.className = "cfg-hint " + (ok ? "success" : "error");
+}
+function setKeyBadge(id, isSet) {
+  setBadge(id, isSet ? "ok" : "unknown", isSet ? "已设置" : "未设置");
+}
+
+// --- Project config ---
+async function loadProjectConfig() {
+  try {
+    var c = await apiJson("/api/config/project?project=" + encodeURIComponent(selectedProject()));
+    setVal("cfgProjectName", c.project_name);
+    setVal("cfgTimezone", c.timezone);
+    setVal("cfgCurrency", c.currency);
+    setVal("cfgTableauWorkbook", c.tableau_workbook);
+    setVal("settingsProjectId", c.project_id);
+  } catch (e) { setCfgMsg("projMsg", false, "加载失败"); }
+}
+async function saveProjectConfig() {
+  try {
+    await apiJson("/api/config/project?project=" + encodeURIComponent(selectedProject()), {
+      method: "POST",
+      body: JSON.stringify({
+        project_name: getVal("cfgProjectName"),
+        timezone: getVal("cfgTimezone"),
+        currency: getVal("cfgCurrency"),
+        tableau_workbook: getVal("cfgTableauWorkbook"),
+      }),
+    });
+    setCfgMsg("projMsg", true, "已保存");
+    showToast("项目信息已保存", true);
+    await loadProjects();
+    refreshStatus();
+  } catch (e) { setCfgMsg("projMsg", false, "保存失败：" + e.message); showToast("保存失败", false); }
+}
+async function createProject() {
+  var pid = getVal("newProjectId");
+  if (!pid) { setCfgMsg("createProjectMsg", false, "请输入项目 ID"); return; }
+  setCfgMsg("createProjectMsg", true, "创建中…");
+  try {
+    var r = await apiJson("/api/init-project", {
+      method: "POST",
+      body: JSON.stringify({ project: pid, name: getVal("newProjectName") }),
+    });
+    if (r.ok === false) throw new Error(r.stderr || "创建失败");
+    setCfgMsg("createProjectMsg", true, "已创建：" + pid);
+    showToast("项目已创建：" + pid, true);
+    setVal("newProjectId", ""); setVal("newProjectName", "");
+    await loadProjects();
+    projectSelect.value = pid;
+    refreshStatus(); refreshKpis(); loadProjectConfig();
+  } catch (e) { setCfgMsg("createProjectMsg", false, "创建失败：" + e.message); showToast("创建失败", false); }
+}
+
+// --- AI config ---
+async function loadAiConfig() {
+  try {
+    var c = await apiJson("/api/config/ai");
+    setChecked("aiUseDeepseek", c.use_deepseek);
+    setChecked("aiFallback", c.fallback_to_rule_template);
+    setVal("aiModel", c.model);
+    setVal("aiBaseUrl", c.base_url);
+    setVal("aiTemperature", c.temperature);
+    setVal("aiMaxTokens", c.max_tokens);
+    setKeyBadge("aiKeyStatus", c.deepseek_api_key_set);
+  } catch (e) { setCfgMsg("aiMsg", false, "加载失败"); }
+}
+async function saveAiConfig() {
+  try {
+    var r = await apiJson("/api/config/ai", {
+      method: "POST",
+      body: JSON.stringify({
+        use_deepseek: getChecked("aiUseDeepseek"),
+        fallback_to_rule_template: getChecked("aiFallback"),
+        model: getVal("aiModel"),
+        base_url: getVal("aiBaseUrl"),
+        temperature: parseFloat(getVal("aiTemperature")) || 0.3,
+        max_tokens: parseInt(getVal("aiMaxTokens"), 10) || 2000,
+        deepseek_api_key: getVal("aiApiKey") || null,
+      }),
+    });
+    setVal("aiApiKey", "");
+    setKeyBadge("aiKeyStatus", r.deepseek_api_key_set);
+    setCfgMsg("aiMsg", true, "已保存");
+    showToast("AI 配置已保存", true);
+  } catch (e) { setCfgMsg("aiMsg", false, "保存失败：" + e.message); showToast("保存失败", false); }
+}
+
+// --- Metric rules ---
+async function loadMetricRules() {
+  try {
+    var c = await apiJson("/api/config/metric-rules");
+    setVal("ruleRevenue", c.revenue_drop_threshold);
+    setVal("ruleDau", c.dau_drop_threshold);
+    setVal("ruleEcpm", c.ecpm_drop_threshold);
+    setVal("rulePaymentRate", c.payment_rate_drop_threshold);
+    setVal("ruleRetention", c.retention_drop_point_threshold);
+  } catch (e) { setCfgMsg("rulesMsg", false, "加载失败"); }
+}
+async function saveMetricRules() {
+  try {
+    await apiJson("/api/config/metric-rules", {
+      method: "POST",
+      body: JSON.stringify({
+        revenue_drop_threshold: parseFloat(getVal("ruleRevenue")) || 0,
+        dau_drop_threshold: parseFloat(getVal("ruleDau")) || 0,
+        ecpm_drop_threshold: parseFloat(getVal("ruleEcpm")) || 0,
+        payment_rate_drop_threshold: parseFloat(getVal("rulePaymentRate")) || 0,
+        retention_drop_point_threshold: parseFloat(getVal("ruleRetention")) || 0,
+      }),
+    });
+    setCfgMsg("rulesMsg", true, "已保存");
+    showToast("指标规则已保存", true);
+  } catch (e) { setCfgMsg("rulesMsg", false, "保存失败：" + e.message); showToast("保存失败", false); }
+}
+
+// --- Email config ---
+async function loadEmailConfig() {
+  try {
+    var c = await apiJson("/api/config/email");
+    setVal("mailHost", c.smtp_host);
+    setVal("mailPort", c.smtp_port);
+    setVal("mailUser", c.smtp_user);
+    setVal("mailFrom", c.mail_from);
+    setVal("mailTo", c.mail_to);
+    setVal("mailCc", (c.cc || []).join(", "));
+    setKeyBadge("mailPwStatus", c.smtp_password_set);
+  } catch (e) { setCfgMsg("emailMsg", false, "加载失败"); }
+}
+async function saveEmailConfig() {
+  try {
+    var r = await apiJson("/api/config/email", {
+      method: "POST",
+      body: JSON.stringify({
+        smtp_host: getVal("mailHost"),
+        smtp_port: getVal("mailPort"),
+        smtp_user: getVal("mailUser"),
+        smtp_password: getVal("mailPassword") || null,
+        mail_from: getVal("mailFrom"),
+        mail_to: getVal("mailTo"),
+        cc: getVal("mailCc").split(",").map(function (s) { return s.trim(); }).filter(Boolean),
+      }),
+    });
+    setVal("mailPassword", "");
+    setKeyBadge("mailPwStatus", r.smtp_password_set);
+    setCfgMsg("emailMsg", true, "已保存");
+    showToast("邮件配置已保存", true);
+  } catch (e) { setCfgMsg("emailMsg", false, "保存失败：" + e.message); showToast("保存失败", false); }
+}
+
+// --- Sources (Unity / AppLovin) ---
+async function loadSourcesConfig() {
+  try {
+    var c = await apiJson("/api/config/sources");
+    setChecked("unityEnabled", c.unity.enabled);
+    setKeyBadge("unityKeyStatus", c.unity.api_key_set);
+    setChecked("applovinEnabled", c.applovin.enabled);
+    setKeyBadge("applovinKeyStatus", c.applovin.api_key_set);
+  } catch (e) { setCfgMsg("sourcesMsg", false, "加载失败"); }
+}
+async function saveSourcesConfig() {
+  try {
+    var r = await apiJson("/api/config/sources", {
+      method: "POST",
+      body: JSON.stringify({
+        unity: { enabled: getChecked("unityEnabled"), api_key: getVal("unityApiKey") || null },
+        applovin: { enabled: getChecked("applovinEnabled"), api_key: getVal("applovinApiKey") || null },
+      }),
+    });
+    setVal("unityApiKey", ""); setVal("applovinApiKey", "");
+    setKeyBadge("unityKeyStatus", r.unity.api_key_set);
+    setKeyBadge("applovinKeyStatus", r.applovin.api_key_set);
+    setCfgMsg("sourcesMsg", true, "已保存");
+    showToast("数据源配置已保存", true);
+    refreshStatus();
+  } catch (e) { setCfgMsg("sourcesMsg", false, "保存失败：" + e.message); showToast("保存失败", false); }
+}
+
+// --- Raw YAML editor ---
+async function loadRawConfig() {
+  var name = getVal("rawConfigName") || "field_mappings";
+  try {
+    var c = await apiJson("/api/config/raw?name=" + encodeURIComponent(name));
+    setVal("rawConfigContent", c.content);
+    setCfgMsg("rawMsg", true, c.path);
+  } catch (e) { setCfgMsg("rawMsg", false, "加载失败：" + e.message); }
+}
+async function saveRawConfig() {
+  var name = getVal("rawConfigName") || "field_mappings";
+  try {
+    await apiJson("/api/config/raw?name=" + encodeURIComponent(name), {
+      method: "POST",
+      body: JSON.stringify({ content: document.getElementById("rawConfigContent").value }),
+    });
+    setCfgMsg("rawMsg", true, "已保存并通过 YAML 校验");
+    showToast("配置已保存", true);
+  } catch (e) { setCfgMsg("rawMsg", false, "保存失败：" + e.message); showToast("YAML 校验/保存失败", false); }
+}
+
+// --- Auto schedule (Windows Task Scheduler) ---
+async function loadSchedule() {
+  var statusEl = document.getElementById("scheduleStatusText");
+  try {
+    var c = await apiJson("/api/schedule?project=" + encodeURIComponent(selectedProject()));
+    setChecked("scheduleEnabled", !!c.enabled);
+    if (c.time) setVal("scheduleTime", c.time);
+    if (statusEl) {
+      if (!c.supported) {
+        statusEl.textContent = "当前系统非 Windows，无法注册计划任务。";
+      } else if (c.enabled) {
+        statusEl.textContent = "已启用：每天 " + (c.time || "") + " 运行项目 " + c.project + "（任务 " + c.task + "）。";
+      } else {
+        statusEl.textContent = "未启用。勾选后保存即可注册每日计划任务（保存时会弹出 UAC 授权窗口，请点“是”）。";
+      }
+    }
+  } catch (e) {
+    if (statusEl) statusEl.textContent = "加载调度状态失败：" + e.message;
+  }
+}
+async function saveSchedule() {
+  var enabled = getChecked("scheduleEnabled");
+  try {
+    if (enabled) {
+      await apiJson("/api/schedule", {
+        method: "POST",
+        body: JSON.stringify({ project: selectedProject(), time: getVal("scheduleTime") || "08:30" }),
+      });
+      setCfgMsg("scheduleMsg", true, "已注册计划任务");
+      showToast("自动调度已启用", true);
+    } else {
+      await apiJson("/api/schedule?project=" + encodeURIComponent(selectedProject()), { method: "DELETE" });
+      setCfgMsg("scheduleMsg", true, "已移除计划任务");
+      showToast("自动调度已关闭", true);
+    }
+    loadSchedule();
+  } catch (e) {
+    setCfgMsg("scheduleMsg", false, "保存失败：" + e.message);
+    showToast("调度保存失败", false);
+  }
+}
+
+function loadAllSettings() {
+  loadProjectConfig();
+  loadAiConfig();
+  loadMetricRules();
+  loadEmailConfig();
+  loadSourcesConfig();
+  loadRawConfig();
+  loadGa4Config();
+  loadSchedule();
+}
+
+// ===================================================================
 // Event binding
 // ===================================================================
 
@@ -650,7 +1051,9 @@ function bindEvents() {
   });
 
   if (refreshStatusBtn) refreshStatusBtn.addEventListener("click", function () { refreshStatus(); refreshKpis(); });
-  if (projectSelect) projectSelect.addEventListener("change", function () { refreshStatus(); refreshKpis(); loadGa4Config(); });
+  if (projectSelect) projectSelect.addEventListener("change", function () {
+    refreshStatus(); refreshKpis(); loadGa4Config(); loadProjectConfig(); loadSchedule();
+  });
 
   document.querySelectorAll(".runPipelineBtn").forEach(function (btn) {
     btn.addEventListener("click", function () { runStep("run_real_pipeline"); });
@@ -685,6 +1088,34 @@ function bindEvents() {
   bind("ga4CheckBtn", checkGa4Config);
   bind("ga4UploadBtn", uploadGa4Credentials);
   bind("ga4FetchBtn", fetchGa4WithSave);
+
+  // Config center
+  bind("projLoadBtn", loadProjectConfig);
+  bind("projSaveBtn", saveProjectConfig);
+  bind("createProjectBtn", createProject);
+  bind("aiLoadBtn", loadAiConfig);
+  bind("aiSaveBtn", saveAiConfig);
+  bind("rulesLoadBtn", loadMetricRules);
+  bind("rulesSaveBtn", saveMetricRules);
+  bind("emailLoadBtn", loadEmailConfig);
+  bind("emailSaveBtn", saveEmailConfig);
+  bind("sourcesLoadBtn", loadSourcesConfig);
+  bind("sourcesSaveBtn", saveSourcesConfig);
+  bind("rawLoadBtn", loadRawConfig);
+  bind("rawSaveBtn", saveRawConfig);
+  bind("scheduleSaveBtn", saveSchedule);
+  var rawSel = document.getElementById("rawConfigName");
+  if (rawSel) rawSel.addEventListener("change", loadRawConfig);
+
+  // New project quick button (header) → settings project tab
+  bind("newProjectBtn", function () {
+    navigateTo("settings");
+    setTimeout(function () {
+      switchTab("settings", "project");
+      var el = document.getElementById("newProjectId");
+      if (el) el.focus();
+    }, 50);
+  });
 }
 
 // ===================================================================
@@ -719,8 +1150,7 @@ async function init() {
     loadGa4Config();
   } catch (error) {
     setQuickStatus("fail", "初始化失败");
-    var err = document.getElementById("stderrBox");
-    if (err) err.textContent = error.message;
+    appendLog("[初始化失败] " + error.message);
   }
 }
 

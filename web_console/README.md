@@ -7,7 +7,7 @@
 方式一（双击）：
 
 ```
-run_web_console.bat
+open_web_console.bat
 ```
 
 方式二（命令行）：
@@ -31,7 +31,7 @@ http://127.0.0.1:8000
    - `projects/default/data/raw/applovin/`
    - `projects/default/data/raw/ga4/`
 3. 如需从 GA4 Data API 拉数，先配置 `config/api_sources.yaml`，再点击“拉取 GA4 API”。
-4. 点击“运行真实日报流程”。
+4. 点击“一键运行”（运行真实日报流程），可在「运行流程」页查看实时日志。
 5. 打开 Tableau 并刷新数据源。
 6. 从 Tableau 手动导出 PDF 到 `projects/default/reports/pdf/`。
 7. 点击“检查 PDF”。

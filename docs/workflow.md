@@ -4,18 +4,18 @@
 
 ## 流程入口
 
-测试流程：
+测试流程（合成数据，隔离在 demo 项目）：
 
 ```powershell
-run_daily_report.bat
+py scripts\run_all.py
 ```
 
-该流程运行 `scripts/run_all.py`，会生成 Tableau 测试数据源，再生成 AI 上下文和日报文字。
+该流程生成 14 天 Tableau 测试数据到 `projects/demo/`，再生成 AI 上下文和日报文字，不会影响真实项目。
 
 真实流程：
 
 ```powershell
-run_real_daily_report.bat
+py scripts\run_real_daily_report.py --project default
 ```
 
 该流程运行 `scripts/run_real_daily_report.py`，串联：
@@ -28,13 +28,7 @@ scripts/generate_ai_context.py
 scripts/generate_ai_report.py
 ```
 
-完整真实流程测试：
-
-```powershell
-test_real_pipeline.bat
-```
-
-它会创建一个假的 Unity CSV，并跑通 raw -> clean -> mart -> Tableau datasource -> AI 文本。
+也可以直接打开网页控制台（`open_web_console.bat`）逐步运行并查看实时日志。
 
 ## 手动 CSV 输入目录
 
@@ -52,17 +46,9 @@ projects/default/data/raw/ga4/
 py scripts\run_real_daily_report.py --project default
 ```
 
-旧根目录输入目录仍保留给兼容和历史测试：
+所有脚本现在统一通过 `--project` 解析路径（默认 `default`），不再使用旧的仓库根目录 `data/`、`ai/`。如根目录残留历史数据，可用 `scripts/migrate_root_to_project.py` 迁移到 `projects/<id>/` 后删除。
 
-把各平台手工导出的原始 CSV 放到：
-
-```text
-data/raw/unity/
-data/raw/applovin/
-data/raw/ga4/
-```
-
-`scripts/import_raw_csv.py` 会读取这些文件，清洗字段名并输出到 clean 层。
+`scripts/import_raw_csv.py --project <id>` 会读取 `projects/<id>/data/raw/` 下的文件，清洗字段名并输出到 clean 层。
 
 ## 可迁移与多项目
 
@@ -127,7 +113,7 @@ py scripts\migrate_root_to_project.py --project default --apply
 py scripts\run_real_daily_report.py --project default
 ```
 
-`run_real_daily_report.bat` 默认运行 `--project default`。如果要运行其他项目，可以直接执行：
+真实流程默认运行 `--project default`。如果要运行其他项目，可以直接执行：
 
 ```powershell
 py scripts\run_real_daily_report.py --project cash_game_a

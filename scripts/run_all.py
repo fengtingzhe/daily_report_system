@@ -6,6 +6,8 @@
   3. 生成 AI 日报草稿并写回 Tableau CSV
 """
 
+import argparse
+import os
 import sys
 import subprocess
 from pathlib import Path
@@ -24,7 +26,7 @@ logger = setup_logger(log_dir=PROJECT_ROOT / "logs", log_name="run")
 PYTHON_EXE = sys.executable
 
 
-def run_script(script_path: Path, step_name: str) -> None:
+def run_script(script_path: Path, step_name: str, project_id: str) -> None:
     """
     使用 subprocess 运行子脚本。
     步骤名用于日志打印；若子进程返回非 0 退出码，抛出 RuntimeError。
@@ -33,10 +35,17 @@ def run_script(script_path: Path, step_name: str) -> None:
     logger.info(f"脚本路径: {script_path}")
 
     result = subprocess.run(
-        [PYTHON_EXE, str(script_path)],
+        [PYTHON_EXE, str(script_path), "--project", project_id],
         capture_output=True,
         text=True,
+        encoding="utf-8",
+        errors="replace",
         cwd=str(PROJECT_ROOT),
+        env={
+            **os.environ,
+            "PYTHONUTF8": "1",
+            "PYTHONIOENCODING": "utf-8",
+        },
     )
 
     # 将子进程输出打印到控制台和日志
@@ -58,9 +67,19 @@ def run_script(script_path: Path, step_name: str) -> None:
 
 def main() -> None:
     """执行完整的日报最小流程。"""
+    parser = argparse.ArgumentParser(description="Run test daily report pipeline (synthetic data).")
+    parser.add_argument(
+        "--project",
+        default="demo",
+        help="Project ID for test data. Default: demo (isolated from real projects)",
+    )
+    args = parser.parse_args()
+    project_id = args.project
+
     start_time = datetime.now()
     logger.info("=" * 60)
     logger.info(f"日报流程开始，时间: {start_time.strftime('%Y-%m-%d %H:%M:%S')}")
+    logger.info(f"项目: {project_id}")
     logger.info(f"Python 解释器: {PYTHON_EXE}")
     logger.info("=" * 60)
 
@@ -74,7 +93,7 @@ def main() -> None:
     try:
         for rel_path, name in steps:
             script_path = PROJECT_ROOT / rel_path
-            run_script(script_path, name)
+            run_script(script_path, name, project_id)
 
         end_time = datetime.now()
         elapsed = (end_time - start_time).total_seconds()

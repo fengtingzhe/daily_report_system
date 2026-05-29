@@ -45,8 +45,8 @@ def clean_field_name(name: str) -> str:
     6. 去除字段名前后下划线
     返回清洗后的字段名。
     """
-    # 去除 BOM（﻿）
-    name = name.replace("﻿", "").replace("﻿", "")
+    # 去除 BOM
+    name = name.replace("\ufeff", "")
     # 去除前后空格
     name = name.strip()
     # 统一转小写

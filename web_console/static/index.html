@@ -59,11 +59,15 @@
             <div class="header-actions">
               <span class="today-label" id="todayLabel"></span>
               <select id="projectSelect"></select>
+              <button id="newProjectBtn" class="secondary-button" title="新建项目">+ 新建</button>
               <button id="refreshStatusBtn" class="secondary-button">刷新</button>
             </div>
           </div>
 
           <div id="quickStatus" class="quick-status idle">就绪</div>
+
+          <!-- Anomaly alerts -->
+          <div id="alertBanner" class="alert-banner" hidden></div>
 
           <!-- KPI cards -->
           <div class="kpi-grid" id="kpiGrid"></div>
@@ -219,17 +223,17 @@
             </div>
           </div>
 
-          <!-- Single console (the only full log location) -->
+          <!-- Single live console (the only full log location) -->
           <div class="panel" style="margin-top:18px">
-            <div class="panel-heading"><div><h3>运行输出</h3><p>最近一次命令的标准输出与错误</p></div></div>
+            <div class="panel-heading">
+              <div><h3>运行输出</h3><p>实时显示最近一次运行的输出（stdout/stderr 已合并）</p></div>
+              <span id="runStatusInline" class="badge idle">空闲</span>
+            </div>
             <div class="log-meta">
               <span>命令：<code id="lastCommand">-</code></span>
               <span>返回码：<code id="lastReturnCode">-</code></span>
             </div>
-            <div class="log-section-title">stdout</div>
-            <pre id="stdoutBox" class="console-output muted">暂无运行日志。点击上方步骤后将在这里显示输出。</pre>
-            <div class="log-section-title">stderr</div>
-            <pre id="stderrBox" class="console-output error-output muted">-</pre>
+            <pre id="stdoutBox" class="console-output muted">暂无运行日志。点击上方步骤后将在这里实时显示输出。</pre>
           </div>
         </section>
 
@@ -319,22 +323,73 @@
 
           <div class="tabs" data-tab-group="settings">
             <button class="tab-btn active" data-tab="project">项目信息</button>
-            <button class="tab-btn" data-tab="ga4-config">数据源配置</button>
-            <button class="tab-btn" data-tab="paths">系统路径</button>
-            <button class="tab-btn" data-tab="security">安全与状态</button>
+            <button class="tab-btn" data-tab="ga4-config">数据源</button>
+            <button class="tab-btn" data-tab="ai">AI 与指标</button>
+            <button class="tab-btn" data-tab="email">邮件</button>
+            <button class="tab-btn" data-tab="advanced">高级</button>
           </div>
 
           <!-- Project info -->
           <div class="tab-panel active" data-tab="project">
             <div class="panel">
-              <div class="panel-heading"><div><h3>项目基本信息</h3></div></div>
-              <dl class="kv-list">
-                <dt>项目 ID</dt><dd><strong id="settingsProjectId">default</strong></dd>
-                <dt>项目名称</dt><dd id="settingsProjectName">-</dd>
-                <dt>项目路径</dt><dd><code id="settingsProjectPath">-</code></dd>
-                <dt>时区</dt><dd>Asia/Shanghai</dd>
-                <dt>货币</dt><dd>USD</dd>
-              </dl>
+              <div class="panel-heading">
+                <div><h3>项目基本信息</h3><p>可直接在此修改并保存到 project.yaml</p></div>
+                <span id="projMsg" class="cfg-hint"></span>
+              </div>
+              <div class="ga4-form">
+                <div class="ga4-field">
+                  <label>项目 ID</label>
+                  <input type="text" id="settingsProjectId" class="ga4-input" value="default" disabled />
+                </div>
+                <div class="ga4-field">
+                  <label for="cfgProjectName">项目名称</label>
+                  <input type="text" id="cfgProjectName" class="ga4-input" placeholder="例如 Cube Match" />
+                </div>
+                <div class="ga4-field-row">
+                  <div class="ga4-field">
+                    <label for="cfgTimezone">时区</label>
+                    <input type="text" id="cfgTimezone" class="ga4-input" placeholder="Asia/Shanghai" />
+                  </div>
+                  <div class="ga4-field">
+                    <label for="cfgCurrency">货币</label>
+                    <input type="text" id="cfgCurrency" class="ga4-input" placeholder="USD" />
+                  </div>
+                </div>
+                <div class="ga4-field">
+                  <label for="cfgTableauWorkbook">Tableau 工作簿</label>
+                  <input type="text" id="cfgTableauWorkbook" class="ga4-input" placeholder="可留空" />
+                </div>
+                <div class="ga4-field">
+                  <label>项目路径</label>
+                  <input type="text" id="settingsProjectPath" class="ga4-input" disabled />
+                </div>
+                <div class="ga4-button-row">
+                  <button id="projLoadBtn" class="secondary-button">重新加载</button>
+                  <button id="projSaveBtn" class="primary-button">保存</button>
+                </div>
+              </div>
+            </div>
+
+            <div class="panel">
+              <div class="panel-heading">
+                <div><h3>新建项目</h3><p>创建新的项目目录与 project.yaml，创建后可在右上角切换</p></div>
+                <span id="createProjectMsg" class="cfg-hint"></span>
+              </div>
+              <div class="ga4-form">
+                <div class="ga4-field-row">
+                  <div class="ga4-field">
+                    <label for="newProjectId">项目 ID（英文/数字/_-）</label>
+                    <input type="text" id="newProjectId" class="ga4-input" placeholder="例如 cash_game_a" />
+                  </div>
+                  <div class="ga4-field">
+                    <label for="newProjectName">项目名称</label>
+                    <input type="text" id="newProjectName" class="ga4-input" placeholder="例如 网赚游戏 A" />
+                  </div>
+                </div>
+                <div class="ga4-button-row">
+                  <button id="createProjectBtn" class="primary-button">创建项目</button>
+                </div>
+              </div>
             </div>
           </div>
 
@@ -397,13 +452,223 @@
             </div>
 
             <div class="panel">
-              <div class="panel-heading"><div><h3>Unity Ads / AppLovin</h3></div></div>
-              <p class="hint">即将支持。当前请通过 config/api_keys.example.yaml 模板手动配置。</p>
+              <div class="panel-heading">
+                <div><h3>Unity Ads / AppLovin</h3><p>开关与 API Key。Key 写入 .env，不回显原值。</p></div>
+                <span id="sourcesMsg" class="cfg-hint"></span>
+              </div>
+              <div class="ga4-form">
+                <div class="ga4-field">
+                  <label class="ga4-checkbox-label">
+                    <input type="checkbox" id="unityEnabled" /><span>启用 Unity 拉数</span>
+                  </label>
+                </div>
+                <div class="ga4-field">
+                  <label for="unityApiKey">Unity API Key <span id="unityKeyStatus" class="badge unknown">未设置</span></label>
+                  <input type="password" id="unityApiKey" class="ga4-input" placeholder="留空表示不修改" autocomplete="new-password" />
+                </div>
+                <div class="ga4-field">
+                  <label class="ga4-checkbox-label">
+                    <input type="checkbox" id="applovinEnabled" /><span>启用 AppLovin 拉数</span>
+                  </label>
+                </div>
+                <div class="ga4-field">
+                  <label for="applovinApiKey">AppLovin API Key <span id="applovinKeyStatus" class="badge unknown">未设置</span></label>
+                  <input type="password" id="applovinApiKey" class="ga4-input" placeholder="留空表示不修改" autocomplete="new-password" />
+                </div>
+                <div class="ga4-button-row">
+                  <button id="sourcesLoadBtn" class="secondary-button">重新加载</button>
+                  <button id="sourcesSaveBtn" class="primary-button">保存</button>
+                </div>
+                <p class="hint">注：Unity/AppLovin 真实拉数仍在开发，目前可先放手工导出的 CSV 到对应 raw 目录。</p>
+              </div>
             </div>
           </div>
 
-          <!-- System paths -->
-          <div class="tab-panel" data-tab="paths">
+          <!-- AI & metric rules -->
+          <div class="tab-panel" data-tab="ai">
+            <div class="panel">
+              <div class="panel-heading">
+                <div><h3>AI 日报配置</h3><p>DeepSeek 开关与模型。默认关闭时使用本地规则模板。</p></div>
+                <span id="aiMsg" class="cfg-hint"></span>
+              </div>
+              <div class="ga4-form">
+                <div class="ga4-field">
+                  <label class="ga4-checkbox-label">
+                    <input type="checkbox" id="aiUseDeepseek" /><span>启用 DeepSeek（关闭则用本地规则模板）</span>
+                  </label>
+                </div>
+                <div class="ga4-field">
+                  <label class="ga4-checkbox-label">
+                    <input type="checkbox" id="aiFallback" /><span>调用失败时自动回退规则模板</span>
+                  </label>
+                </div>
+                <div class="ga4-field">
+                  <label for="aiApiKey">DeepSeek API Key <span id="aiKeyStatus" class="badge unknown">未设置</span></label>
+                  <input type="password" id="aiApiKey" class="ga4-input" placeholder="留空表示不修改" autocomplete="new-password" />
+                </div>
+                <div class="ga4-field-row">
+                  <div class="ga4-field">
+                    <label for="aiModel">模型</label>
+                    <input type="text" id="aiModel" class="ga4-input" placeholder="deepseek-chat" />
+                  </div>
+                  <div class="ga4-field">
+                    <label for="aiBaseUrl">Base URL</label>
+                    <input type="text" id="aiBaseUrl" class="ga4-input" placeholder="https://api.deepseek.com/chat/completions" />
+                  </div>
+                </div>
+                <div class="ga4-field-row">
+                  <div class="ga4-field">
+                    <label for="aiTemperature">Temperature</label>
+                    <input type="number" step="0.1" id="aiTemperature" class="ga4-input" placeholder="0.3" />
+                  </div>
+                  <div class="ga4-field">
+                    <label for="aiMaxTokens">Max Tokens</label>
+                    <input type="number" id="aiMaxTokens" class="ga4-input" placeholder="2000" />
+                  </div>
+                </div>
+                <div class="ga4-button-row">
+                  <button id="aiLoadBtn" class="secondary-button">重新加载</button>
+                  <button id="aiSaveBtn" class="primary-button">保存</button>
+                </div>
+              </div>
+            </div>
+
+            <div class="panel">
+              <div class="panel-heading">
+                <div><h3>指标告警阈值</h3><p>环比跌幅超过阈值时在 AI 上下文中生成告警。比例值，如 -0.1 表示 -10%。</p></div>
+                <span id="rulesMsg" class="cfg-hint"></span>
+              </div>
+              <div class="ga4-form">
+                <div class="ga4-field-row">
+                  <div class="ga4-field">
+                    <label for="ruleRevenue">收入跌幅阈值</label>
+                    <input type="number" step="0.01" id="ruleRevenue" class="ga4-input" placeholder="-0.1" />
+                  </div>
+                  <div class="ga4-field">
+                    <label for="ruleDau">DAU 跌幅阈值</label>
+                    <input type="number" step="0.01" id="ruleDau" class="ga4-input" placeholder="-0.1" />
+                  </div>
+                </div>
+                <div class="ga4-field-row">
+                  <div class="ga4-field">
+                    <label for="ruleEcpm">eCPM 跌幅阈值</label>
+                    <input type="number" step="0.01" id="ruleEcpm" class="ga4-input" placeholder="-0.15" />
+                  </div>
+                  <div class="ga4-field">
+                    <label for="rulePaymentRate">付费率跌幅阈值</label>
+                    <input type="number" step="0.01" id="rulePaymentRate" class="ga4-input" placeholder="-0.15" />
+                  </div>
+                </div>
+                <div class="ga4-field-row">
+                  <div class="ga4-field">
+                    <label for="ruleRetention">留存跌幅阈值（百分点比例）</label>
+                    <input type="number" step="0.01" id="ruleRetention" class="ga4-input" placeholder="-0.03" />
+                  </div>
+                  <div class="ga4-field"></div>
+                </div>
+                <div class="ga4-button-row">
+                  <button id="rulesLoadBtn" class="secondary-button">重新加载</button>
+                  <button id="rulesSaveBtn" class="primary-button">保存</button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Email -->
+          <div class="tab-panel" data-tab="email">
+            <div class="panel">
+              <div class="panel-heading">
+                <div><h3>邮件与 SMTP</h3><p>收件人与发信配置。密码写入 .env，不回显。当前仅 dry-run 预演。</p></div>
+                <span id="emailMsg" class="cfg-hint"></span>
+              </div>
+              <div class="ga4-form">
+                <div class="ga4-field-row">
+                  <div class="ga4-field">
+                    <label for="mailHost">SMTP Host</label>
+                    <input type="text" id="mailHost" class="ga4-input" placeholder="smtp.example.com" />
+                  </div>
+                  <div class="ga4-field">
+                    <label for="mailPort">SMTP Port</label>
+                    <input type="text" id="mailPort" class="ga4-input" placeholder="465" />
+                  </div>
+                </div>
+                <div class="ga4-field">
+                  <label for="mailUser">SMTP 用户名</label>
+                  <input type="text" id="mailUser" class="ga4-input" placeholder="发信账号" />
+                </div>
+                <div class="ga4-field">
+                  <label for="mailPassword">SMTP 密码 <span id="mailPwStatus" class="badge unknown">未设置</span></label>
+                  <input type="password" id="mailPassword" class="ga4-input" placeholder="留空表示不修改" autocomplete="new-password" />
+                </div>
+                <div class="ga4-field">
+                  <label for="mailFrom">发件人 (MAIL_FROM)</label>
+                  <input type="text" id="mailFrom" class="ga4-input" placeholder="reports@example.com" />
+                </div>
+                <div class="ga4-field">
+                  <label for="mailTo">收件人 (逗号分隔)</label>
+                  <input type="text" id="mailTo" class="ga4-input" placeholder="a@example.com, b@example.com" />
+                </div>
+                <div class="ga4-field">
+                  <label for="mailCc">抄送 CC (逗号分隔)</label>
+                  <input type="text" id="mailCc" class="ga4-input" placeholder="team@example.com" />
+                </div>
+                <div class="ga4-button-row">
+                  <button id="emailLoadBtn" class="secondary-button">重新加载</button>
+                  <button id="emailSaveBtn" class="primary-button">保存</button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Advanced: raw YAML editor + paths + security -->
+          <div class="tab-panel" data-tab="advanced">
+            <div class="panel">
+              <div class="panel-heading">
+                <div><h3>自动调度</h3><p>注册 Windows 计划任务，每天定时无人值守运行当前项目的真实日报流程。</p></div>
+                <span id="scheduleMsg" class="cfg-hint"></span>
+              </div>
+              <div class="ga4-form">
+                <div class="schedule-row">
+                  <label class="switch-field">
+                    <input type="checkbox" id="scheduleEnabled" />
+                    <span>启用每日自动运行</span>
+                  </label>
+                  <div class="ga4-field schedule-time">
+                    <label for="scheduleTime">运行时间（24 小时制）</label>
+                    <input type="time" id="scheduleTime" class="ga4-input" value="08:30" />
+                  </div>
+                </div>
+                <p class="cfg-hint" id="scheduleStatusText">检查中…</p>
+                <div class="ga4-button-row">
+                  <button id="scheduleSaveBtn" class="primary-button">保存调度</button>
+                </div>
+              </div>
+            </div>
+
+            <div class="panel">
+              <div class="panel-heading">
+                <div><h3>高级配置（原始 YAML）</h3><p>直接编辑字段映射等高级配置。保存前会校验 YAML 合法性。</p></div>
+                <span id="rawMsg" class="cfg-hint"></span>
+              </div>
+              <div class="ga4-form">
+                <div class="ga4-field">
+                  <label for="rawConfigName">配置文件</label>
+                  <select id="rawConfigName" class="ga4-input">
+                    <option value="field_mappings">field_mappings.yaml</option>
+                    <option value="tableau_config">tableau_config.yaml</option>
+                  </select>
+                </div>
+                <div class="ga4-field">
+                  <label for="rawConfigContent">内容</label>
+                  <textarea id="rawConfigContent" class="cfg-textarea" spellcheck="false" placeholder="加载后显示文件内容…"></textarea>
+                </div>
+                <div class="ga4-button-row">
+                  <button id="rawLoadBtn" class="secondary-button">重新加载</button>
+                  <button id="rawSaveBtn" class="primary-button">校验并保存</button>
+                </div>
+              </div>
+            </div>
+
             <div class="panel">
               <div class="panel-heading"><div><h3>项目路径</h3></div></div>
               <dl class="kv-list">
@@ -420,22 +685,10 @@
                 <dt>Temp</dt><dd><code id="settingsTempPath">-</code></dd>
               </dl>
             </div>
-          </div>
 
-          <!-- Security & status -->
-          <div class="tab-panel" data-tab="security">
-            <div class="panel">
-              <div class="panel-heading"><div><h3>系统状态</h3></div></div>
-              <dl class="kv-list">
-                <dt>DeepSeek AI</dt><dd><span class="badge warn">暂未配置</span></dd>
-                <dt>SMTP 邮件</dt><dd><span class="badge warn">Dry-run 模式</span></dd>
-                <dt>Tableau</dt><dd><span class="badge warn">暂未启用</span></dd>
-                <dt>访问地址</dt><dd><code>http://127.0.0.1:8000</code>（仅本地）</dd>
-              </dl>
-            </div>
             <div class="panel">
               <div class="panel-heading"><div><h3>安全约束</h3></div></div>
-              <p class="hint">控制台仅在本地运行：脚本白名单执行、不预览 .env、邮件仅 dry-run、不提供文件删除。</p>
+              <p class="hint">控制台仅在本地运行：脚本白名单执行、邮件仅 dry-run、不提供文件删除。密钥写入 .env 后不回显原值。</p>
             </div>
           </div>
         </section>

@@ -1,10 +1,19 @@
-pandas
-numpy
-pyyaml
-requests
-openpyxl
-python-dotenv
-fastapi
-uvicorn
-google-analytics-data
-google-auth
+# 运行依赖（带最低版本下限，便于复制到其他 Windows 机器后稳定安装）
+# 如需完全锁定版本，可在装好后执行： py -m pip freeze > requirements.lock.txt
+
+# 数据处理
+pandas>=2.0,<3.0
+numpy>=1.24
+
+# 配置与环境
+pyyaml>=6.0
+python-dotenv>=1.0
+
+# HTTP / GA4 拉数
+requests>=2.31
+google-analytics-data>=0.18
+google-auth>=2.30
+
+# 网页控制台
+fastapi>=0.110
+uvicorn>=0.29

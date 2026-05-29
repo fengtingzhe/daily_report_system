@@ -13,6 +13,7 @@ from datetime import datetime
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 import pandas as pd
+import yaml
 
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
@@ -39,6 +40,7 @@ PROJECT_CONFIG = {
 OVERVIEW_METRICS = [
     "dau", "new_users", "revenue", "ad_revenue", "iap_revenue",
     "arpdau", "ecpm", "impressions", "impressions_per_dau",
+    "payers", "payment_rate", "arppu",
     "d1_retention", "d7_retention",
 ]
 
@@ -102,6 +104,9 @@ def build_overview(df: pd.DataFrame) -> dict:
             "ecpm": float(row["ecpm"]),
             "impressions": int(row["impressions"]),
             "impressions_per_dau": float(row["impressions_per_dau"]),
+            "payers": int(row.get("payers", 0) or 0),
+            "payment_rate": float(row.get("payment_rate", 0) or 0),
+            "arppu": float(row.get("arppu", 0) or 0),
             "d1_retention": float(row["d1_retention"]),
             "d7_retention": float(row["d7_retention"]),
         }
@@ -149,6 +154,9 @@ def build_empty_overview() -> dict:
         "ecpm": 0.0,
         "impressions": 0,
         "impressions_per_dau": 0.0,
+        "payers": 0,
+        "payment_rate": 0.0,
+        "arppu": 0.0,
         "d1_retention": 0.0,
         "d7_retention": 0.0,
     }
@@ -179,6 +187,9 @@ def build_single_day_overview(df: pd.DataFrame) -> dict:
         "ecpm": float(latest["ecpm"]),
         "impressions": int(latest["impressions"]),
         "impressions_per_dau": float(latest["impressions_per_dau"]),
+        "payers": int(latest.get("payers", 0) or 0),
+        "payment_rate": float(latest.get("payment_rate", 0) or 0),
+        "arppu": float(latest.get("arppu", 0) or 0),
         "d1_retention": float(latest["d1_retention"]),
         "d7_retention": float(latest["d7_retention"]),
     }
@@ -192,6 +203,9 @@ def build_single_day_overview(df: pd.DataFrame) -> dict:
         "ecpm": 0.0,
         "impressions": 0,
         "impressions_per_dau": 0.0,
+        "payers": 0,
+        "payment_rate": 0.0,
+        "arppu": 0.0,
         "d1_retention": 0.0,
         "d7_retention": 0.0,
     }
@@ -204,19 +218,59 @@ def build_single_day_overview(df: pd.DataFrame) -> dict:
     }
 
 
+METRIC_RULES_PATH = PROJECT_ROOT / "config" / "metric_rules.yaml"
+METRIC_RULES_DEFAULTS = {
+    "revenue_drop_threshold": -0.10,
+    "dau_drop_threshold": -0.10,
+    "ecpm_drop_threshold": -0.15,
+    "payment_rate_drop_threshold": -0.15,
+    "retention_drop_point_threshold": -0.03,
+}
+
+
+def load_metric_rules() -> dict:
+    """读取 config/metric_rules.yaml 的告警阈值；缺失项用默认值兜底。"""
+    rules = dict(METRIC_RULES_DEFAULTS)
+    if METRIC_RULES_PATH.exists():
+        try:
+            with open(METRIC_RULES_PATH, "r", encoding="utf-8") as f:
+                data = yaml.safe_load(f) or {}
+            if isinstance(data, dict):
+                for key in rules:
+                    if data.get(key) is not None:
+                        rules[key] = float(data[key])
+        except (yaml.YAMLError, ValueError, OSError):
+            pass
+    return rules
+
+
 def build_alerts(change: dict) -> list[dict]:
-    """根据环比变化和阈值规则生成告警列表。"""
+    """根据环比变化和阈值规则生成告警列表（阈值来自 config/metric_rules.yaml）。"""
+    rules = load_metric_rules()
+    rev_t = rules["revenue_drop_threshold"]
+    dau_t = rules["dau_drop_threshold"]
+    ecpm_t = rules["ecpm_drop_threshold"]
+    pay_t = rules["payment_rate_drop_threshold"]
+    ret_t = rules["retention_drop_point_threshold"]
+
+    def pct(value: float) -> str:
+        return f"{abs(value) * 100:.0f}%"
+
+    def point(value: float) -> str:
+        return f"{abs(value) * 100:.0f} 个百分点"
+
     alerts = []
-    rules = [
-        ("revenue", "revenue", "收入环比下降超过 10%", lambda v: v is not None and v <= -0.10),
-        ("dau", "dau", "DAU 环比下降超过 10%", lambda v: v is not None and v <= -0.10),
-        ("ecpm", "ecpm", "eCPM 环比下降超过 15%", lambda v: v is not None and v <= -0.15),
-        ("d1_retention", "d1_retention", "D1 留存环比下降超过 3 个百分点", lambda v: v is not None and v <= -0.03),
-        ("d7_retention", "d7_retention", "D7 留存环比下降超过 3 个百分点", lambda v: v is not None and v <= -0.03),
+    rule_defs = [
+        ("revenue", "revenue", f"收入环比下降超过 {pct(rev_t)}", rev_t),
+        ("dau", "dau", f"DAU 环比下降超过 {pct(dau_t)}", dau_t),
+        ("ecpm", "ecpm", f"eCPM 环比下降超过 {pct(ecpm_t)}", ecpm_t),
+        ("payment_rate", "payment_rate", f"付费率环比下降超过 {pct(pay_t)}", pay_t),
+        ("d1_retention", "d1_retention", f"D1 留存环比下降超过 {point(ret_t)}", ret_t),
+        ("d7_retention", "d7_retention", f"D7 留存环比下降超过 {point(ret_t)}", ret_t),
     ]
-    for metric_key, label, message, condition in rules:
+    for metric_key, label, message, threshold in rule_defs:
         val = change.get(metric_key)
-        if condition(val):
+        if val is not None and val <= threshold:
             alerts.append({
                 "level": "warning",
                 "metric": label,
@@ -333,10 +387,6 @@ def parse_args() -> argparse.Namespace:
 def configure_paths(project_id: str | None) -> None:
     """根据项目 ID 配置 Tableau 数据源和 AI context 路径。"""
     global TABLEAU_DIR, OUTPUT_PATH, PROJECT_CONFIG
-    if "--project" not in sys.argv:
-        print("Project: legacy-root (no --project provided)")
-        return
-
     paths = ensure_project_dirs(project_id)
     PROJECT_CONFIG = load_project_config(project_id)
     TABLEAU_DIR = paths["tableau_datasource_dir"]
