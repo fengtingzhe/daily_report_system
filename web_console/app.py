@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import csv
 import os
 import re
 import subprocess
@@ -271,6 +272,104 @@ def api_project_status(project: str = Query(default="default")) -> dict[str, Any
             "latest_log": relative_path(latest_log) if latest_log else None,
         },
     }
+
+
+KPI_METRICS: list[dict[str, str]] = [
+    {"key": "revenue", "label": "总收入"},
+    {"key": "dau", "label": "DAU"},
+    {"key": "new_users", "label": "新增用户"},
+    {"key": "arpdau", "label": "ARPDAU"},
+    {"key": "ecpm", "label": "eCPM"},
+    {"key": "d1_retention", "label": "次日留存"},
+]
+
+
+def _read_overview_rows(project_id: str) -> list[dict[str, str]]:
+    paths = get_project_paths(project_id)
+    candidates = [
+        paths["mart_dir"] / "mart_daily_overview.csv",
+        paths["tableau_datasource_dir"] / "mart_daily_overview.csv",
+    ]
+    target = next((path for path in candidates if path.exists()), None)
+    if target is None:
+        return []
+    with open(target, "r", encoding="utf-8-sig", newline="") as f:
+        return [row for row in csv.DictReader(f) if row.get("date")]
+
+
+def _to_float(value: object) -> float:
+    try:
+        return float(str(value).strip())
+    except (TypeError, ValueError):
+        return 0.0
+
+
+def _aggregate_by_date(rows: list[dict[str, str]]) -> dict[str, dict[str, float]]:
+    """Sum across projects so KPIs reflect a single daily timeline."""
+    buckets: dict[str, dict[str, float]] = {}
+    for row in rows:
+        date = row.get("date", "").strip()
+        if not date:
+            continue
+        bucket = buckets.setdefault(
+            date,
+            {"dau": 0.0, "new_users": 0.0, "revenue": 0.0, "ad_revenue": 0.0,
+             "impressions": 0.0, "_ret_sum": 0.0, "_ret_n": 0.0},
+        )
+        bucket["dau"] += _to_float(row.get("dau"))
+        bucket["new_users"] += _to_float(row.get("new_users"))
+        bucket["revenue"] += _to_float(row.get("revenue"))
+        bucket["ad_revenue"] += _to_float(row.get("ad_revenue"))
+        bucket["impressions"] += _to_float(row.get("impressions"))
+        if row.get("d1_retention") not in (None, ""):
+            bucket["_ret_sum"] += _to_float(row.get("d1_retention"))
+            bucket["_ret_n"] += 1
+    return buckets
+
+
+def _metrics_for(bucket: dict[str, float]) -> dict[str, float]:
+    dau = bucket["dau"]
+    impressions = bucket["impressions"]
+    ret_n = bucket["_ret_n"]
+    return {
+        "revenue": bucket["revenue"],
+        "dau": dau,
+        "new_users": bucket["new_users"],
+        "arpdau": (bucket["revenue"] / dau) if dau else 0.0,
+        "ecpm": (bucket["ad_revenue"] / impressions * 1000) if impressions else 0.0,
+        "d1_retention": (bucket["_ret_sum"] / ret_n) if ret_n else 0.0,
+    }
+
+
+@app.get("/api/kpi")
+def api_kpi(project: str = Query(default="default")) -> dict[str, Any]:
+    project_id = validate_project_id(project)
+    rows = _read_overview_rows(project_id)
+    if not rows:
+        return {"ok": False, "message": "mart_daily_overview.csv 不存在或为空。", "metrics": []}
+
+    buckets = _aggregate_by_date(rows)
+    dates = sorted(buckets.keys())
+    if not dates:
+        return {"ok": False, "message": "无有效日期数据。", "metrics": []}
+
+    latest_date = dates[-1]
+    prev_date = dates[-2] if len(dates) > 1 else None
+    latest = _metrics_for(buckets[latest_date])
+    prev = _metrics_for(buckets[prev_date]) if prev_date else None
+
+    metrics: list[dict[str, Any]] = []
+    for meta in KPI_METRICS:
+        key = meta["key"]
+        value = latest.get(key, 0.0)
+        delta_pct: float | None = None
+        if prev is not None:
+            base = prev.get(key, 0.0)
+            if base:
+                delta_pct = round((value - base) / abs(base) * 100, 1)
+        metrics.append({"key": key, "label": meta["label"], "value": value, "delta_pct": delta_pct})
+
+    return {"ok": True, "date": latest_date, "prev_date": prev_date, "metrics": metrics}
 
 
 @app.post("/api/run-step")
