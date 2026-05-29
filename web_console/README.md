@@ -4,6 +4,14 @@
 
 ## 启动
 
+方式一（双击）：
+
+```
+run_web_console.bat
+```
+
+方式二（命令行）：
+
 ```powershell
 cd D:\daily_report_system
 py web_console\app.py

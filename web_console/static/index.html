@@ -3,244 +3,545 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>本地游戏运营日报控制台</title>
+    <title>运营日报控制台</title>
     <link rel="stylesheet" href="/static/style.css" />
   </head>
   <body>
-    <header class="topbar">
-      <div>
-        <h1>本地游戏运营日报控制台</h1>
-        <p>Daily Report System Console</p>
-      </div>
-      <div id="healthBadge" class="badge">Local only: 127.0.0.1</div>
-    </header>
+    <!-- Toast container -->
+    <div id="toast"></div>
 
-    <main class="layout">
-      <section class="panel project-panel">
-        <div class="panel-heading">
-          <div>
-            <h2>项目</h2>
-            <p>选择要处理的本地项目。</p>
-          </div>
-          <button id="refreshStatusBtn" class="secondary-button">刷新状态</button>
+    <div class="app-shell">
+      <!-- ================================================================ -->
+      <!-- Sidebar -->
+      <!-- ================================================================ -->
+      <aside class="sidebar">
+        <div class="sidebar-brand">
+          <h1>运营日报控制台</h1>
+          <p>Daily Report System</p>
         </div>
 
-        <div class="project-row">
-          <label for="projectSelect">Project</label>
-          <select id="projectSelect"></select>
-        </div>
-
-        <dl class="project-meta">
-          <div>
-            <dt>项目名</dt>
-            <dd id="projectName">-</dd>
-          </div>
-          <div>
-            <dt>项目路径</dt>
-            <dd id="projectPath">-</dd>
-          </div>
-        </dl>
-      </section>
-
-      <section class="status-grid" aria-label="项目目录状态">
-        <div class="status-card">
-          <span>Unity raw CSV</span>
-          <strong id="rawUnityCount">0</strong>
-        </div>
-        <div class="status-card">
-          <span>AppLovin raw CSV</span>
-          <strong id="rawApplovinCount">0</strong>
-        </div>
-        <div class="status-card">
-          <span>GA4 raw CSV</span>
-          <strong id="rawGa4Count">0</strong>
-        </div>
-        <div class="status-card">
-          <span>Clean CSV</span>
-          <strong id="cleanCount">0</strong>
-        </div>
-        <div class="status-card">
-          <span>Mart CSV</span>
-          <strong id="martCount">0</strong>
-        </div>
-        <div class="status-card">
-          <span>Tableau CSV</span>
-          <strong id="tableauCount">0</strong>
-        </div>
-        <div class="status-card">
-          <span>PDF</span>
-          <strong id="pdfCount">0</strong>
-        </div>
-      </section>
-
-      <section class="panel details-panel">
-        <div class="detail-line">
-          <span>最新 PDF</span>
-          <code id="latestPdf">-</code>
-        </div>
-        <div class="detail-line">
-          <span>最新 log</span>
-          <code id="latestLog">-</code>
-        </div>
-      </section>
-
-      <section class="panel">
-        <div class="panel-heading">
-          <div>
-            <h2>操作</h2>
-            <p>所有按钮只会调用后端白名单脚本。</p>
-          </div>
-        </div>
-
-        <div class="button-grid">
-          <button class="action-button" data-step="fetch_ga4_api">拉取 GA4 API</button>
-          <button class="action-button" data-step="import_raw_csv">导入原始 CSV</button>
-          <button class="action-button" data-step="build_mart">生成 Mart</button>
-          <button class="action-button" data-step="sync_tableau">同步 Tableau 数据源</button>
-          <button class="action-button" data-step="generate_ai_context">生成 AI 上下文</button>
-          <button class="action-button" data-step="generate_ai_report">生成 AI 日报文字</button>
-          <button class="action-button" data-step="check_pdf">检查 PDF</button>
-          <button class="action-button" data-step="send_email_dry_run">邮件 Dry-run</button>
-          <button id="runPipelineBtn" class="primary-button">运行真实日报流程</button>
-        </div>
-      </section>
-
-      <section class="panel" id="ga4ConfigPanel">
-        <div class="panel-heading">
-          <div>
-            <h2>GA4 API 配置</h2>
-            <p>配置 GA4 Data API 拉数参数。所有内容保存在本地，不上传。</p>
-          </div>
-          <div class="ga4-status-row">
-            <span id="ga4ConfigStatus" class="ga4-status-badge unknown">未加载</span>
-            <span id="ga4CredsStatus" class="ga4-status-badge unknown">凭证未检查</span>
-          </div>
-        </div>
-
-        <div class="ga4-form">
-          <div class="ga4-field">
-            <label class="ga4-checkbox-label">
-              <input type="checkbox" id="ga4Enabled" />
-              <span>启用 GA4 API 拉数</span>
-            </label>
-          </div>
-
-          <div class="ga4-field">
-            <label for="ga4PropertyId">Property ID</label>
-            <input type="text" id="ga4PropertyId" placeholder="例如 123456789" class="ga4-input" />
-          </div>
-
-          <div class="ga4-field">
-            <label for="ga4CredentialsPath">Credentials Path</label>
-            <input type="text" id="ga4CredentialsPath" placeholder="secrets/ga4-service-account.json" class="ga4-input" />
-          </div>
-
-          <div class="ga4-field">
-            <label>服务账号 JSON</label>
-            <div class="ga4-upload-row">
-              <input type="file" id="ga4CredentialsFile" accept=".json" class="ga4-file-input" />
-              <button id="ga4UploadBtn" class="secondary-button">上传服务账号 JSON</button>
-            </div>
-            <span id="ga4UploadMsg" class="ga4-hint"></span>
-          </div>
-
-          <div class="ga4-field-row">
-            <div class="ga4-field">
-              <label for="ga4StartDate">Start Date</label>
-              <input type="text" id="ga4StartDate" placeholder="7daysAgo" class="ga4-input" />
-            </div>
-            <div class="ga4-field">
-              <label for="ga4EndDate">End Date</label>
-              <input type="text" id="ga4EndDate" placeholder="yesterday" class="ga4-input" />
-            </div>
-          </div>
-
-          <fieldset class="ga4-reports-fieldset">
-            <legend>Reports</legend>
-            <label class="ga4-checkbox-label">
-              <input type="checkbox" id="ga4ReportDailyOverview" checked />
-              <span>daily_overview</span>
-            </label>
-            <label class="ga4-checkbox-label">
-              <input type="checkbox" id="ga4ReportCountryPlatform" checked />
-              <span>country_platform_daily</span>
-            </label>
-            <label class="ga4-checkbox-label">
-              <input type="checkbox" id="ga4ReportEventDaily" checked />
-              <span>event_daily</span>
-            </label>
-          </fieldset>
-
-          <div id="ga4CheckMessages" class="ga4-check-messages"></div>
-
-          <div class="ga4-button-row">
-            <button id="ga4LoadBtn" class="secondary-button">加载 GA4 配置</button>
-            <button id="ga4SaveBtn" class="primary-button">保存 GA4 配置</button>
-            <button id="ga4CheckBtn" class="secondary-button">检查 GA4 配置</button>
-            <button id="ga4FetchBtn" class="action-button" data-step="fetch_ga4_api">拉取 GA4 API</button>
-          </div>
-        </div>
-      </section>
-
-      <section class="panel">
-        <div class="panel-heading">
-          <div>
-            <h2>文件预览</h2>
-            <p>仅允许读取项目内固定输出文件。</p>
-          </div>
-        </div>
-
-        <div class="button-grid compact">
-          <button class="preview-button" data-type="ai_report_text">查看 AI 文案 CSV</button>
-          <button class="preview-button" data-type="ai_context">查看 AI Context JSON</button>
-          <button class="preview-button" data-type="ai_draft">查看 AI Markdown 草稿</button>
-          <button class="preview-button" data-type="latest_log">查看最新日志</button>
-        </div>
-
-        <div id="previewMeta" class="preview-meta">未选择文件。</div>
-        <pre id="filePreview" class="console-output muted">文件内容会显示在这里。</pre>
-      </section>
-
-      <section class="panel">
-        <div class="panel-heading">
-          <div>
-            <h2>运行日志</h2>
-            <p>最近一次命令的 stdout / stderr。</p>
-          </div>
-          <span id="runStatus" class="run-status idle">Idle</span>
-        </div>
-
-        <dl class="run-meta">
-          <div>
-            <dt>Command</dt>
-            <dd><code id="lastCommand">-</code></dd>
-          </div>
-          <div>
-            <dt>Return code</dt>
-            <dd><code id="lastReturnCode">-</code></dd>
-          </div>
-        </dl>
-
-        <h3>stdout</h3>
-        <pre id="stdoutBox" class="console-output">-</pre>
-        <h3>stderr</h3>
-        <pre id="stderrBox" class="console-output error-output">-</pre>
-      </section>
-
-      <section class="panel path-panel">
-        <div class="panel-heading">
-          <div>
-            <h2>真实 CSV 放置路径</h2>
-            <p>把平台导出的 CSV 放到这些目录后，再运行真实日报流程。</p>
-          </div>
-        </div>
-        <ul>
-          <li><code id="rawUnityPath">projects/default/data/raw/unity/</code></li>
-          <li><code id="rawApplovinPath">projects/default/data/raw/applovin/</code></li>
-          <li><code id="rawGa4Path">projects/default/data/raw/ga4/</code></li>
+        <ul class="sidebar-nav">
+          <li class="sidebar-item active" data-page="dashboard">
+            <span class="nav-icon">&#9680;</span> 总览
+          </li>
+          <li class="sidebar-item" data-page="data-ingestion">
+            <span class="nav-icon">&#8690;</span> 数据接入
+          </li>
+          <li class="sidebar-item" data-page="report-center">
+            <span class="nav-icon">&#9776;</span> 日报中心
+          </li>
+          <li class="sidebar-item" data-page="file-center">
+            <span class="nav-icon">&#9776;</span> 文件中心
+          </li>
+          <li class="sidebar-item" data-page="settings">
+            <span class="nav-icon">&#9881;</span> 项目与配置
+          </li>
+          <li class="sidebar-item" data-page="logs">
+            <span class="nav-icon">&#9776;</span> 系统日志
+          </li>
         </ul>
-      </section>
-    </main>
+
+        <div class="sidebar-footer">
+          <div class="project-badge">
+            <div class="project-icon" id="sidebarProjectIcon">C</div>
+            <div>
+              <div class="project-name" id="sidebarProjectName">Cube Match</div>
+              <div class="project-id" id="sidebarProjectId">default</div>
+            </div>
+          </div>
+          <div class="sidebar-badge">127.0.0.1</div>
+        </div>
+      </aside>
+
+      <!-- ================================================================ -->
+      <!-- Main Content -->
+      <!-- ================================================================ -->
+      <main class="main-content">
+
+        <!-- ============================================================ -->
+        <!-- Page 1: Dashboard -->
+        <!-- ============================================================ -->
+        <section class="page-view active" data-page="dashboard">
+          <div class="page-header">
+            <h2>总览 Dashboard</h2>
+            <div class="header-actions">
+              <span class="today-label" id="todayLabel"></span>
+              <select id="projectSelect"></select>
+              <button id="refreshStatusBtn" class="secondary-button">刷新状态</button>
+            </div>
+          </div>
+
+          <!-- Quick status bar -->
+          <div id="quickStatus" class="quick-status idle">就绪</div>
+
+          <!-- 5 status summary cards -->
+          <div class="summary-grid">
+            <div class="summary-card">
+              <span class="sc-label">GA4 配置</span>
+              <span class="sc-value" id="dsGa4Status">检查中...</span>
+              <span class="sc-desc">GA4 连接与权限状态</span>
+            </div>
+            <div class="summary-card">
+              <span class="sc-label">数据接入</span>
+              <span class="sc-value" id="dsDataStatus">检查中...</span>
+              <span class="sc-desc">各数据源同步状态</span>
+            </div>
+            <div class="summary-card">
+              <span class="sc-label">日报流程</span>
+              <span class="sc-value" id="dsPipelineStatus">未运行</span>
+              <span class="sc-desc">最近一次真实日报流程</span>
+            </div>
+            <div class="summary-card">
+              <span class="sc-label">PDF 状态</span>
+              <span class="sc-value" id="dsPdfStatus">-</span>
+              <span class="sc-desc">最新 PDF 状态</span>
+            </div>
+            <div class="summary-card">
+              <span class="sc-label">邮件状态</span>
+              <span class="sc-value">Dry-run</span>
+              <span class="sc-desc">邮件发送模式</span>
+            </div>
+          </div>
+
+          <!-- 4 metric cards -->
+          <div class="metric-grid">
+            <div class="metric-card">
+              <span class="mc-label">Unity Raw CSV</span>
+              <span class="mc-value" id="rawUnityCount">0</span>
+              <span class="mc-sub" id="rawUnityPath">-</span>
+            </div>
+            <div class="metric-card">
+              <span class="mc-label">AppLovin Raw CSV</span>
+              <span class="mc-value" id="rawApplovinCount">0</span>
+              <span class="mc-sub" id="rawApplovinPath">-</span>
+            </div>
+            <div class="metric-card">
+              <span class="mc-label">GA4 Raw CSV</span>
+              <span class="mc-value" id="rawGa4Count">0</span>
+              <span class="mc-sub" id="rawGa4Path">-</span>
+            </div>
+            <div class="metric-card">
+              <span class="mc-label">最近日报生成</span>
+              <span class="mc-value" style="font-size:20px" id="dashLatestPdf">-</span>
+              <span class="mc-sub">latest PDF</span>
+            </div>
+          </div>
+
+          <!-- Quick actions -->
+          <div class="panel">
+            <div class="panel-heading"><h3>快捷操作</h3></div>
+            <div class="action-grid">
+              <button class="action-button" data-step="fetch_ga4_api">拉取 GA4 API</button>
+              <button id="runPipelineBtn" class="primary-button">运行真实日报流程</button>
+              <button class="secondary-button" onclick="navigateTo('data-ingestion')">打开数据接入</button>
+              <button class="secondary-button" onclick="navigateTo('report-center')">打开日报中心</button>
+            </div>
+          </div>
+
+          <!-- Recent tasks -->
+          <div class="panel">
+            <div class="panel-heading"><h3>最近任务</h3></div>
+            <div class="data-table-wrapper">
+              <table id="taskTable">
+                <thead>
+                  <tr><th>时间</th><th>任务</th><th>状态</th><th>耗时</th><th>返回码</th></tr>
+                </thead>
+                <tbody>
+                  <tr id="taskEmptyRow"><td colspan="5" style="text-align:center;color:var(--muted);padding:24px">暂无任务记录</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- Data source status -->
+          <div class="panel">
+            <div class="panel-heading"><h3>数据源状态</h3></div>
+            <div class="data-table-wrapper">
+              <table>
+                <thead>
+                  <tr><th>数据源</th><th>状态</th><th>文件数</th><th>最近更新</th></tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td>Unity</td>
+                    <td><span class="badge-sm ok" id="dsUnityStatus">已接入</span></td>
+                    <td id="rawUnityCount2">0</td>
+                    <td>-</td>
+                  </tr>
+                  <tr>
+                    <td>AppLovin</td>
+                    <td><span class="badge-sm ok" id="dsApplovinStatus">已接入</span></td>
+                    <td id="rawApplovinCount2">0</td>
+                    <td>-</td>
+                  </tr>
+                  <tr>
+                    <td>GA4</td>
+                    <td><span class="badge-sm ok" id="dsGa4Status2">已接入</span></td>
+                    <td id="rawGa4Count2">0</td>
+                    <td>-</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <!-- ============================================================ -->
+        <!-- Page 2: Data Ingestion -->
+        <!-- ============================================================ -->
+        <section class="page-view" data-page="data-ingestion">
+          <div class="page-header">
+            <h2>数据接入 Data Ingestion</h2>
+          </div>
+
+          <div class="tabs" data-tab-group="ingestion">
+            <button class="tab-btn active" data-tab="ga4">GA4</button>
+            <button class="tab-btn" data-tab="csv">手工 CSV</button>
+            <button class="tab-btn" data-tab="history">接入历史</button>
+          </div>
+
+          <!-- Tab: GA4 -->
+          <div class="tab-panel active" data-tab="ga4">
+            <div class="panel">
+              <div class="panel-heading">
+                <div>
+                  <h3>GA4 API 配置</h3>
+                  <p>配置 GA4 Data API 拉数参数。所有内容保存在本地，不上传。</p>
+                </div>
+                <div class="ga4-status-row">
+                  <span id="ga4ConfigStatus" class="ga4-status-badge unknown">未加载</span>
+                  <span id="ga4CredsStatus" class="ga4-status-badge unknown">凭证未检查</span>
+                </div>
+              </div>
+
+              <div class="ga4-form">
+                <div class="ga4-field">
+                  <label class="ga4-checkbox-label">
+                    <input type="checkbox" id="ga4Enabled" />
+                    <span>启用 GA4 API 拉数</span>
+                  </label>
+                </div>
+
+                <div class="ga4-field">
+                  <label for="ga4PropertyId">Property ID</label>
+                  <input type="text" id="ga4PropertyId" placeholder="例如 123456789" class="ga4-input" />
+                </div>
+
+                <div class="ga4-field">
+                  <label for="ga4CredentialsPath">Credentials Path</label>
+                  <input type="text" id="ga4CredentialsPath" placeholder="secrets/ga4-service-account.json" class="ga4-input" />
+                </div>
+
+                <div class="ga4-field">
+                  <label>服务账号 JSON</label>
+                  <div class="ga4-upload-row">
+                    <input type="file" id="ga4CredentialsFile" accept=".json" class="ga4-file-input" />
+                    <button id="ga4UploadBtn" class="secondary-button">上传服务账号 JSON</button>
+                  </div>
+                  <span id="ga4UploadMsg" class="ga4-hint"></span>
+                </div>
+
+                <div class="ga4-field-row">
+                  <div class="ga4-field">
+                    <label for="ga4StartDate">Start Date</label>
+                    <input type="text" id="ga4StartDate" placeholder="7daysAgo" class="ga4-input" />
+                  </div>
+                  <div class="ga4-field">
+                    <label for="ga4EndDate">End Date</label>
+                    <input type="text" id="ga4EndDate" placeholder="yesterday" class="ga4-input" />
+                  </div>
+                </div>
+
+                <fieldset class="ga4-reports-fieldset">
+                  <legend>Reports</legend>
+                  <label class="ga4-checkbox-label">
+                    <input type="checkbox" id="ga4ReportDailyOverview" checked />
+                    <span>daily_overview</span>
+                  </label>
+                  <label class="ga4-checkbox-label">
+                    <input type="checkbox" id="ga4ReportCountryPlatform" checked />
+                    <span>country_platform_daily</span>
+                  </label>
+                  <label class="ga4-checkbox-label">
+                    <input type="checkbox" id="ga4ReportEventDaily" checked />
+                    <span>event_daily</span>
+                  </label>
+                </fieldset>
+
+                <div id="ga4CheckMessages" class="ga4-check-messages"></div>
+
+                <div class="ga4-button-row">
+                  <button id="ga4LoadBtn" class="secondary-button">加载 GA4 配置</button>
+                  <button id="ga4SaveBtn" class="primary-button">保存 GA4 配置</button>
+                  <button id="ga4CheckBtn" class="secondary-button">检查 GA4 配置</button>
+                  <button id="ga4FetchBtn" class="action-button">拉取 GA4 API</button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Tab: CSV -->
+          <div class="tab-panel" data-tab="csv">
+            <div class="panel">
+              <div class="panel-heading">
+                <div>
+                  <h3>手工 CSV 文件</h3>
+                  <p>把平台导出的 CSV 文件通过资源管理器复制到对应目录，然后点击导入。</p>
+                </div>
+                <button class="action-button" data-step="import_raw_csv">导入原始 CSV</button>
+              </div>
+              <div class="file-card-grid">
+                <div class="file-card">
+                  <div class="fc-name">Unity raw</div>
+                  <div class="fc-path" id="rawUnityPath">-</div>
+                  <div class="fc-count">文件数: <span id="rawUnityCount">0</span></div>
+                </div>
+                <div class="file-card">
+                  <div class="fc-name">AppLovin raw</div>
+                  <div class="fc-path" id="rawApplovinPath">-</div>
+                  <div class="fc-count">文件数: <span id="rawApplovinCount">0</span></div>
+                </div>
+                <div class="file-card">
+                  <div class="fc-name">GA4 raw</div>
+                  <div class="fc-path" id="rawGa4Path">-</div>
+                  <div class="fc-count">文件数: <span id="rawGa4Count">0</span></div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Tab: History -->
+          <div class="tab-panel" data-tab="history">
+            <div class="panel">
+              <div class="panel-heading"><h3>接入历史</h3></div>
+              <p style="color:var(--muted);font-size:13px">最近的数据接入操作记录。</p>
+            </div>
+          </div>
+        </section>
+
+        <!-- ============================================================ -->
+        <!-- Page 3: Report Center -->
+        <!-- ============================================================ -->
+        <section class="page-view" data-page="report-center">
+          <div class="page-header">
+            <h2>日报中心 Report Center</h2>
+          </div>
+
+          <div class="tabs" data-tab-group="report">
+            <button class="tab-btn active" data-tab="pipeline">流程运行</button>
+            <button class="tab-btn" data-tab="ai">AI 日报</button>
+            <button class="tab-btn" data-tab="pdf-mail">PDF 与邮件</button>
+          </div>
+
+          <!-- Tab: Pipeline -->
+          <div class="tab-panel active" data-tab="pipeline">
+            <div class="panel">
+              <div class="panel-heading">
+                <div>
+                  <h3>流程步骤</h3>
+                  <p>按顺序执行，或一键运行完整流程。</p>
+                </div>
+                <button id="runPipelineBtn" class="primary-button">运行真实日报流程</button>
+              </div>
+              <div class="action-grid cols-3">
+                <button class="action-button" data-step="import_raw_csv">1. 导入原始 CSV</button>
+                <button class="action-button" data-step="build_mart">2. 生成 Mart</button>
+                <button class="action-button" data-step="sync_tableau">3. 同步 Tableau 数据源</button>
+                <button class="action-button" data-step="generate_ai_context">4. 生成 AI 上下文</button>
+                <button class="action-button" data-step="generate_ai_report">5. 生成 AI 日报文字</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Tab: AI Report -->
+          <div class="tab-panel" data-tab="ai">
+            <div class="panel">
+              <div class="panel-heading">
+                <h3>AI 日报内容</h3>
+              </div>
+              <div class="action-grid cols-2">
+                <button class="action-button" data-step="generate_ai_context">生成 AI 上下文</button>
+                <button class="action-button" data-step="generate_ai_report">生成 AI 日报文字</button>
+                <button class="secondary-button preview-button" data-type="ai_context">查看 AI Context JSON</button>
+                <button class="secondary-button preview-button" data-type="ai_draft">查看 AI Markdown 草稿</button>
+                <button class="secondary-button preview-button" data-type="ai_report_text">查看 AI 文案 CSV</button>
+              </div>
+            </div>
+            <div class="panel">
+              <div class="panel-heading"><h3>预览</h3></div>
+              <div id="previewMeta" class="preview-meta" style="font-size:13px;color:var(--muted);margin-bottom:8px">未选择文件。</div>
+              <pre id="filePreview" class="console-output muted">文件内容会显示在这里。</pre>
+            </div>
+          </div>
+
+          <!-- Tab: PDF & Mail -->
+          <div class="tab-panel" data-tab="pdf-mail">
+            <div class="panel">
+              <div class="panel-heading">
+                <div>
+                  <h3>PDF 与邮件</h3>
+                  <p>当前仅支持 dry-run，不正式发送邮件。</p>
+                </div>
+              </div>
+              <div class="action-grid cols-2">
+                <button class="action-button" data-step="check_pdf">检查 PDF</button>
+                <button class="action-button" data-step="send_email_dry_run">邮件 Dry-run</button>
+              </div>
+            </div>
+            <div class="panel">
+              <div class="panel-heading"><h3>状态</h3></div>
+              <table>
+                <tbody>
+                  <tr><td style="color:var(--muted)">最新 PDF</td><td><code id="latestPdf">-</code></td></tr>
+                  <tr><td style="color:var(--muted)">PDF 数量</td><td><strong id="pdfCount">0</strong></td></tr>
+                  <tr><td style="color:var(--muted)">邮件模式</td><td><span class="badge-sm warn">仅 Dry-run</span></td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <!-- ============================================================ -->
+        <!-- Page 4: File Center -->
+        <!-- ============================================================ -->
+        <section class="page-view" data-page="file-center">
+          <div class="page-header">
+            <h2>文件中心 File Center</h2>
+          </div>
+
+          <div class="tabs" data-tab-group="files">
+            <button class="tab-btn active" data-tab="raw">Raw Files</button>
+            <button class="tab-btn" data-tab="tableau">Tableau Datasource</button>
+            <button class="tab-btn" data-tab="ai-files">AI Files</button>
+            <button class="tab-btn" data-tab="reports">Reports</button>
+          </div>
+
+          <!-- Tab: Raw Files -->
+          <div class="tab-panel active" data-tab="raw">
+            <div class="panel">
+              <div class="panel-heading"><h3>Raw 文件</h3></div>
+              <table>
+                <tr><td style="color:var(--muted)">Unity</td><td><code id="rawUnityPath">-</code></td><td>文件: <strong id="rawUnityCount">0</strong></td></tr>
+                <tr><td style="color:var(--muted)">AppLovin</td><td><code id="rawApplovinPath">-</code></td><td>文件: <strong id="rawApplovinCount">0</strong></td></tr>
+                <tr><td style="color:var(--muted)">GA4</td><td><code id="rawGa4Path">-</code></td><td>文件: <strong id="rawGa4Count">0</strong></td></tr>
+              </table>
+            </div>
+          </div>
+
+          <!-- Tab: Tableau Datasource -->
+          <div class="tab-panel" data-tab="tableau">
+            <div class="panel">
+              <div class="panel-heading">
+                <h3>Tableau 数据源</h3>
+              </div>
+              <p style="color:var(--muted);font-size:13px">Tableau CSV 数量: <strong id="tableauCount">0</strong></p>
+              <button class="secondary-button preview-button" data-type="ai_report_text" style="margin-top:8px">查看 AI 文案 CSV</button>
+            </div>
+          </div>
+
+          <!-- Tab: AI Files -->
+          <div class="tab-panel" data-tab="ai-files">
+            <div class="panel">
+              <div class="panel-heading"><h3>AI 文件</h3></div>
+              <div class="action-grid cols-2">
+                <button class="secondary-button preview-button" data-type="ai_context">查看 AI Context JSON</button>
+                <button class="secondary-button preview-button" data-type="ai_draft">查看 AI Markdown 草稿</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Tab: Reports -->
+          <div class="tab-panel" data-tab="reports">
+            <div class="panel">
+              <div class="panel-heading"><h3>Reports</h3></div>
+              <table>
+                <tr><td style="color:var(--muted)">最新 PDF</td><td><code id="latestPdf">-</code></td></tr>
+                <tr><td style="color:var(--muted)">PDF 数量</td><td><strong id="pdfCount">0</strong></td></tr>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <!-- ============================================================ -->
+        <!-- Page 5: Project & Settings -->
+        <!-- ============================================================ -->
+        <section class="page-view" data-page="settings">
+          <div class="page-header">
+            <h2>项目与配置 Project &amp; Settings</h2>
+          </div>
+
+          <div class="tabs" data-tab-group="settings">
+            <button class="tab-btn active" data-tab="project">项目管理</button>
+            <button class="tab-btn" data-tab="ga4-config">GA4 配置</button>
+            <button class="tab-btn" data-tab="system">系统配置</button>
+          </div>
+
+          <!-- Tab: Project -->
+          <div class="tab-panel active" data-tab="project">
+            <div class="panel">
+              <div class="panel-heading"><h3>当前项目</h3></div>
+              <table>
+                <tr><td style="color:var(--muted);width:120px">项目 ID</td><td><strong><span id="settingsProjectId">default</span></strong></td></tr>
+                <tr><td style="color:var(--muted)">项目名</td><td><span id="projectName">-</span></td></tr>
+                <tr><td style="color:var(--muted)">项目路径</td><td><code id="projectPath">-</code></td></tr>
+              </table>
+            </div>
+          </div>
+
+          <!-- Tab: GA4 Config (shortcut) -->
+          <div class="tab-panel" data-tab="ga4-config">
+            <div class="panel">
+              <div class="panel-heading">
+                <div>
+                  <h3>GA4 配置</h3>
+                  <p>与数据接入页面的 GA4 配置相同。</p>
+                </div>
+                <button class="primary-button" onclick="navigateTo('data-ingestion');document.querySelector('[data-tab=ga4]').click()">打开数据接入 / GA4</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Tab: System -->
+          <div class="tab-panel" data-tab="system">
+            <div class="panel">
+              <div class="panel-heading"><h3>系统配置</h3></div>
+              <table>
+                <tr><td style="color:var(--muted);width:180px">DeepSeek AI</td><td><span class="badge-sm warn">暂未配置</span></td></tr>
+                <tr><td style="color:var(--muted)">SMTP 邮件</td><td><span class="badge-sm warn">Dry-run</span></td></tr>
+                <tr><td style="color:var(--muted)">Tableau 自动导出</td><td><span class="badge-sm warn">暂未启用</span></td></tr>
+                <tr><td style="color:var(--muted)">DuckDB</td><td><span class="badge-sm warn">未来计划</span></td></tr>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <!-- ============================================================ -->
+        <!-- Page 6: System Logs -->
+        <!-- ============================================================ -->
+        <section class="page-view" data-page="logs">
+          <div class="page-header">
+            <h2>系统日志 Logs</h2>
+            <span id="runStatus" class="ga4-status-badge unknown">Idle</span>
+          </div>
+
+          <div class="panel">
+            <dl class="log-meta">
+              <dt>Command</dt>
+              <dd><code id="lastCommand">-</code></dd>
+              <dt>Return code</dt>
+              <dd><code id="lastReturnCode">-</code></dd>
+            </dl>
+
+            <div class="log-section-title">stdout</div>
+            <pre id="stdoutBox" class="console-output">-</pre>
+
+            <div class="log-section-title">stderr</div>
+            <pre id="stderrBox" class="console-output error-output">-</pre>
+          </div>
+        </section>
+
+      </main>
+    </div>
 
     <script src="/static/app.js"></script>
   </body>

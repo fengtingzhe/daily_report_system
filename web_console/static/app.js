@@ -1,11 +1,15 @@
+// ===================================================================
+// Daily Report System Console — Application
+// ===================================================================
+
 const projectSelect = document.getElementById("projectSelect");
 const refreshStatusBtn = document.getElementById("refreshStatusBtn");
-const runPipelineBtn = document.getElementById("runPipelineBtn");
-const runStatus = document.getElementById("runStatus");
 
 let projects = [];
 let currentStatus = null;
 let isRunning = false;
+let taskHistory = [];
+let lastResult = null;
 
 const stepLabels = {
   fetch_ga4_api: "拉取 GA4 API",
@@ -19,81 +23,293 @@ const stepLabels = {
   send_email_dry_run: "邮件 Dry-run",
 };
 
+// ===================================================================
+// Helpers
+// ===================================================================
+
 function selectedProject() {
   return projectSelect.value || "default";
 }
 
-async function apiJson(url, options = {}) {
-  const response = await fetch(url, {
-    headers: {
-      "Content-Type": "application/json",
-      ...(options.headers || {}),
-    },
-    ...options,
-  });
+function setText(id, value) {
+  const el = document.getElementById(id);
+  if (el) el.textContent = value ?? "-";
+}
 
+/* Update all elements matching an ID (handles duplicate IDs in the DOM). */
+function setTextAll(id, value) {
+  document.querySelectorAll('[id="' + id + '"]').forEach(function (el) {
+    el.textContent = value ?? "-";
+  });
+}
+
+async function apiJson(url, options) {
+  if (!options) options = {};
+  const response = await fetch(url, {
+    headers: Object.assign({ "Content-Type": "application/json" }, options.headers || {}),
+    method: options.method || "GET",
+    body: options.body || undefined,
+  });
   const data = await response.json();
   if (!response.ok) {
-    throw new Error(data.detail || `HTTP ${response.status}`);
+    throw new Error(data.detail || "HTTP " + response.status);
   }
   return data;
 }
 
-function setText(id, value) {
-  document.getElementById(id).textContent = value ?? "-";
+function formatTime() {
+  const now = new Date();
+  const h = String(now.getHours()).padStart(2, "0");
+  const m = String(now.getMinutes()).padStart(2, "0");
+  const s = String(now.getSeconds()).padStart(2, "0");
+  return h + ":" + m + ":" + s;
+}
+
+// ===================================================================
+// Toast notification
+// ===================================================================
+
+function showToast(message, ok) {
+  const toast = document.getElementById("toast");
+  toast.textContent = message;
+  toast.className = "toast " + (ok ? "success" : "fail");
+  clearTimeout(toast._timeout);
+  toast._timeout = setTimeout(function () {
+    toast.classList.add("fade-out");
+  }, 2200);
+}
+
+// ===================================================================
+// Quick status bar
+// ===================================================================
+
+function setQuickStatus(state, label) {
+  const el = document.getElementById("quickStatus");
+  if (!el) return;
+  el.textContent = label;
+  el.className = "quick-status " + state;
 }
 
 function setRunState(state, label) {
-  runStatus.className = `run-status ${state}`;
-  runStatus.textContent = label;
+  const el = document.getElementById("runStatus");
+  if (!el) return;
+  el.className = "ga4-status-badge " + state;
+  el.textContent = label;
 }
+
+// ===================================================================
+// Task history
+// ===================================================================
+
+function addTaskEntry(result) {
+  taskHistory.unshift({
+    time: formatTime(),
+    step: result.step,
+    label: stepLabels[result.step] || result.step,
+    ok: result.ok,
+    duration: result.duration_seconds ?? 0,
+    returncode: result.returncode ?? "-",
+  });
+  if (taskHistory.length > 5) taskHistory.length = 5;
+  renderTaskTable();
+}
+
+function renderTaskTable() {
+  var tbody = document.querySelector("#taskTable tbody");
+  if (!tbody) return;
+  if (!taskHistory.length) {
+    tbody.innerHTML =
+      '<tr id="taskEmptyRow"><td colspan="5" style="text-align:center;color:var(--muted);padding:24px">暂无任务记录</td></tr>';
+    return;
+  }
+  tbody.innerHTML = taskHistory
+    .map(function (t) {
+      var badge = t.ok
+        ? '<span class="badge-sm ok">成功</span>'
+        : '<span class="badge-sm fail">失败</span>';
+      return (
+        "<tr>" +
+        "<td>" + t.time + "</td>" +
+        "<td>" + t.label + "</td>" +
+        "<td>" + badge + "</td>" +
+        "<td>" + t.duration + "s</td>" +
+        "<td>" + t.returncode + "</td>" +
+        "</tr>"
+      );
+    })
+    .join("");
+}
+
+// ===================================================================
+// Navigation
+// ===================================================================
+
+function navigateTo(pageName) {
+  // Hide all page views
+  document.querySelectorAll(".page-view").forEach(function (pv) {
+    pv.classList.remove("active");
+  });
+  // Show target
+  var target = document.querySelector('.page-view[data-page="' + pageName + '"]');
+  if (target) target.classList.add("active");
+  // Update sidebar
+  document.querySelectorAll(".sidebar-item").forEach(function (item) {
+    item.classList.toggle("active", item.getAttribute("data-page") === pageName);
+  });
+}
+
+// ===================================================================
+// Tabs
+// ===================================================================
+
+function switchTab(group, tabName) {
+  var container = document.querySelector(
+    '.page-view.active .tabs[data-tab-group="' + group + '"]'
+  );
+  if (!container) {
+    // Try within the target page-view
+    var pageView = document.querySelector('.page-view[data-page="' + group + '"]');
+    if (pageView) {
+      container = pageView.querySelector('.tabs[data-tab-group="ingestion"]') ||
+                  pageView.querySelector('.tabs[data-tab-group="report"]') ||
+                  pageView.querySelector('.tabs[data-tab-group="files"]') ||
+                  pageView.querySelector('.tabs[data-tab-group="settings"]');
+    }
+  }
+  if (!container) return;
+
+  // Update tab buttons
+  container.querySelectorAll(".tab-btn").forEach(function (btn) {
+    btn.classList.toggle("active", btn.getAttribute("data-tab") === tabName);
+  });
+
+  // Find the parent page view and update tab panels within it
+  var pageView = container.closest(".page-view");
+  if (!pageView) pageView = document;
+  pageView.querySelectorAll(".tab-panel[data-tab]").forEach(function (panel) {
+    panel.classList.toggle("active", panel.getAttribute("data-tab") === tabName);
+  });
+}
+
+// ===================================================================
+// Button state
+// ===================================================================
 
 function setButtonsDisabled(disabled) {
   isRunning = disabled;
-  document
-    .querySelectorAll("button")
-    .forEach((button) => {
-      button.disabled = disabled;
-    });
+  document.querySelectorAll("button").forEach(function (btn) {
+    btn.disabled = disabled;
+  });
 }
 
+// ===================================================================
+// Output / log handling
+// ===================================================================
+
 function setOutput(result) {
+  lastResult = result;
   setText("lastCommand", result.command || "-");
   setText("lastReturnCode", String(result.returncode ?? "-"));
   setText("stdoutBox", result.stdout || "-");
   setText("stderrBox", result.stderr || "-");
 
   if (result.ok) {
-    setRunState("success", `Success · ${result.duration_seconds ?? 0}s`);
+    setRunState("ok", "Success · " + (result.duration_seconds ?? 0) + "s");
+    setQuickStatus("success", "上一步成功 · " + (result.duration_seconds ?? 0) + "s");
+    showToast((stepLabels[result.step] || result.step) + " 成功", true);
   } else {
-    setRunState("failed", `Failed · ${result.duration_seconds ?? 0}s`);
+    setRunState("fail", "Failed · " + (result.duration_seconds ?? 0) + "s");
+    setQuickStatus("fail", "上一步失败 · " + (result.duration_seconds ?? 0) + "s");
+    showToast((stepLabels[result.step] || result.step) + " 失败", false);
+  }
+
+  addTaskEntry(result);
+
+  // Update dashboard summary cards
+  if (result.step === "run_real_pipeline") {
+    setText("dsPipelineStatus", result.ok ? "成功" : "失败");
+    document.getElementById("dsPipelineStatus").className =
+      "sc-value " + (result.ok ? "sc-ok" : "sc-fail");
   }
 }
 
+// ===================================================================
+// Project & status
+// ===================================================================
+
 function updateProjectMeta() {
-  const project = projects.find((item) => item.project_id === selectedProject());
-  setText("projectName", project?.project_name || currentStatus?.project_name || "-");
-  setText("projectPath", project?.path || `projects/${selectedProject()}`);
+  var project = null;
+  for (var i = 0; i < projects.length; i++) {
+    if (projects[i].project_id === selectedProject()) {
+      project = projects[i];
+      break;
+    }
+  }
+  var pn = project ? project.project_name : null;
+  if (!pn && currentStatus) pn = currentStatus.project_name;
+  setTextAll("projectName", pn || "-");
+  setTextAll("projectPath", project ? project.path : "projects/" + selectedProject());
+
+  // Sidebar project card
+  setText("sidebarProjectName", pn || "Cube Match");
+  setText("sidebarProjectId", selectedProject());
+  var icon = document.getElementById("sidebarProjectIcon");
+  if (icon) icon.textContent = (pn || "C").charAt(0).toUpperCase();
 }
 
 function updateStatusView(status) {
   currentStatus = status;
   updateProjectMeta();
 
-  setText("rawUnityCount", status.counts.raw_unity_csv);
-  setText("rawApplovinCount", status.counts.raw_applovin_csv);
-  setText("rawGa4Count", status.counts.raw_ga4_csv);
-  setText("cleanCount", status.counts.clean_csv);
-  setText("martCount", status.counts.mart_csv);
-  setText("tableauCount", status.counts.tableau_csv);
-  setText("pdfCount", status.counts.pdf);
+  // Counts — update all instances
+  setTextAll("rawUnityCount", status.counts.raw_unity_csv);
+  setTextAll("rawApplovinCount", status.counts.raw_applovin_csv);
+  setTextAll("rawGa4Count", status.counts.raw_ga4_csv);
+  setTextAll("cleanCount", status.counts.clean_csv);
+  setTextAll("martCount", status.counts.mart_csv);
+  setTextAll("tableauCount", status.counts.tableau_csv);
+  setTextAll("pdfCount", status.counts.pdf);
 
-  setText("latestPdf", status.latest_files.latest_pdf || "-");
-  setText("latestLog", status.latest_files.latest_log || "-");
+  // Paths — update all instances
+  setTextAll("rawUnityPath", (status.paths.raw_unity || "") + "/");
+  setTextAll("rawApplovinPath", (status.paths.raw_applovin || "") + "/");
+  setTextAll("rawGa4Path", (status.paths.raw_ga4 || "") + "/");
 
-  setText("rawUnityPath", `${status.paths.raw_unity}/`);
-  setText("rawApplovinPath", `${status.paths.raw_applovin}/`);
-  setText("rawGa4Path", `${status.paths.raw_ga4}/`);
+  setTextAll("latestPdf", status.latest_files.latest_pdf || "-");
+  setTextAll("latestLog", status.latest_files.latest_log || "-");
+
+  // Dashboard specifically
+  setText("dashLatestPdf", status.latest_files.latest_pdf || "-");
+
+  // Update data source status badges
+  function badge(elId, count) {
+    var el = document.getElementById(elId);
+    if (!el) return;
+    if (count > 0) { el.textContent = "已接入"; el.className = "badge-sm ok"; }
+    else { el.textContent = "无数据"; el.className = "badge-sm warn"; }
+  }
+  badge("dsUnityStatus", status.counts.raw_unity_csv);
+  badge("dsApplovinStatus", status.counts.raw_applovin_csv);
+  badge("dsGa4Status2", status.counts.raw_ga4_csv);
+
+  // Data status summary card
+  var hasData = status.counts.raw_unity_csv + status.counts.raw_applovin_csv + status.counts.raw_ga4_csv;
+  var ds = document.getElementById("dsDataStatus");
+  if (ds) {
+    ds.textContent = hasData > 0 ? "今日已更新" : "待更新";
+    ds.className = "sc-value " + (hasData > 0 ? "sc-ok" : "sc-warn");
+  }
+}
+
+async function refreshStatus() {
+  try {
+    var status = await apiJson("/api/project-status?project=" + encodeURIComponent(selectedProject()));
+    updateStatusView(status);
+    updateGa4DashboardCard();
+    setQuickStatus("idle", "就绪");
+  } catch (e) {
+    setQuickStatus("fail", "刷新失败: " + e.message);
+  }
 }
 
 async function loadProjects() {
@@ -101,55 +317,54 @@ async function loadProjects() {
   projectSelect.innerHTML = "";
 
   if (!projects.length) {
-    const option = document.createElement("option");
-    option.value = "default";
-    option.textContent = "default";
-    projectSelect.appendChild(option);
+    var opt = document.createElement("option");
+    opt.value = "default";
+    opt.textContent = "default";
+    projectSelect.appendChild(opt);
     return;
   }
 
-  for (const project of projects) {
-    const option = document.createElement("option");
-    option.value = project.project_id;
-    option.textContent = `${project.project_id} · ${project.project_name || project.project_id}`;
-    projectSelect.appendChild(option);
+  for (var i = 0; i < projects.length; i++) {
+    var p = projects[i];
+    var opt = document.createElement("option");
+    opt.value = p.project_id;
+    opt.textContent = p.project_id + " · " + (p.project_name || p.project_id);
+    projectSelect.appendChild(opt);
   }
 
-  const defaultProject = projects.find((item) => item.project_id === "default");
-  projectSelect.value = defaultProject ? "default" : projects[0].project_id;
+  var def = null;
+  for (var j = 0; j < projects.length; j++) {
+    if (projects[j].project_id === "default") { def = projects[j]; break; }
+  }
+  projectSelect.value = def ? "default" : projects[0].project_id;
 }
 
-async function refreshStatus() {
-  const project = selectedProject();
-  const status = await apiJson(`/api/project-status?project=${encodeURIComponent(project)}`);
-  updateStatusView(status);
-}
+// ===================================================================
+// Run step
+// ===================================================================
 
 async function runStep(step) {
-  if (isRunning) {
-    return;
-  }
+  if (isRunning) return;
 
   setButtonsDisabled(true);
-  setRunState("running", "运行中...");
+  setRunState("ok", "运行中...");
+  setQuickStatus("running", "运行中: " + (stepLabels[step] || step));
   setText("lastCommand", stepLabels[step] || step);
   setText("lastReturnCode", "-");
   setText("stdoutBox", "Running...");
   setText("stderrBox", "-");
 
   try {
-    const result = await apiJson("/api/run-step", {
+    var result = await apiJson("/api/run-step", {
       method: "POST",
-      body: JSON.stringify({
-        project: selectedProject(),
-        step,
-      }),
+      body: JSON.stringify({ project: selectedProject(), step: step }),
     });
     setOutput(result);
     await refreshStatus();
   } catch (error) {
     setOutput({
       ok: false,
+      step: step,
       command: step,
       returncode: "-",
       stdout: "",
@@ -161,27 +376,26 @@ async function runStep(step) {
   }
 }
 
+// ===================================================================
+// File preview
+// ===================================================================
+
 async function readFile(type) {
-  if (isRunning) {
-    return;
-  }
+  if (isRunning) return;
 
   setText("previewMeta", "读取中...");
   setText("filePreview", "");
 
   try {
-    const result = await apiJson(
-      `/api/read-file?project=${encodeURIComponent(selectedProject())}&type=${encodeURIComponent(type)}`
+    var result = await apiJson(
+      "/api/read-file?project=" + encodeURIComponent(selectedProject()) + "&type=" + encodeURIComponent(type)
     );
-
     if (!result.ok) {
       setText("previewMeta", result.message || "文件暂不存在。");
       setText("filePreview", "文件暂不存在。");
       return;
     }
-
-    const suffix = result.truncated ? " · 已截断预览" : "";
-    setText("previewMeta", `${result.path}${suffix}`);
+    setText("previewMeta", result.path + (result.truncated ? " · 已截断预览" : ""));
     setText("filePreview", result.content || "(empty file)");
   } catch (error) {
     setText("previewMeta", "读取失败");
@@ -189,51 +403,41 @@ async function readFile(type) {
   }
 }
 
-function bindEvents() {
-  refreshStatusBtn.addEventListener("click", refreshStatus);
-  projectSelect.addEventListener("change", refreshStatus);
-  runPipelineBtn.addEventListener("click", () => runStep("run_real_pipeline"));
-
-  document.querySelectorAll(".action-button").forEach((button) => {
-    button.addEventListener("click", () => runStep(button.dataset.step));
-  });
-
-  document.querySelectorAll(".preview-button").forEach((button) => {
-    button.addEventListener("click", () => readFile(button.dataset.type));
-  });
-
-  // GA4 config buttons
-  document.getElementById("ga4LoadBtn").addEventListener("click", loadGa4Config);
-  document.getElementById("ga4SaveBtn").addEventListener("click", saveGa4Config);
-  document.getElementById("ga4CheckBtn").addEventListener("click", checkGa4Config);
-  document.getElementById("ga4UploadBtn").addEventListener("click", uploadGa4Credentials);
-  // ga4FetchBtn is handled by .action-button selector (has data-step="fetch_ga4_api")
-}
-
-// ---------------------------------------------------------------------------
-// GA4 Configuration
-// ---------------------------------------------------------------------------
+// ===================================================================
+// GA4 Configuration (unchanged from previous version)
+// ===================================================================
 
 function setGa4ConfigStatus(ok, text) {
-  const el = document.getElementById("ga4ConfigStatus");
+  var el = document.getElementById("ga4ConfigStatus");
+  if (!el) return;
   el.textContent = text;
-  el.className = `ga4-status-badge ${ok ? "ok" : "fail"}`;
+  el.className = "ga4-status-badge " + (ok ? "ok" : "fail");
+
+  // Also update dashboard card
+  var ds = document.getElementById("dsGa4Status");
+  if (ds) {
+    ds.textContent = text;
+    ds.className = "sc-value " + (ok ? "sc-ok" : "sc-fail");
+  }
 }
 
 function setGa4CredsStatus(ok, text) {
-  const el = document.getElementById("ga4CredsStatus");
+  var el = document.getElementById("ga4CredsStatus");
+  if (!el) return;
   el.textContent = text;
-  el.className = `ga4-status-badge ${ok ? "ok" : "fail"}`;
+  el.className = "ga4-status-badge " + (ok ? "ok" : "fail");
 }
 
 function setGa4UploadMsg(ok, text) {
-  const el = document.getElementById("ga4UploadMsg");
+  var el = document.getElementById("ga4UploadMsg");
+  if (!el) return;
   el.textContent = text;
-  el.className = `ga4-hint ${ok ? "success" : "error"}`;
+  el.className = "ga4-hint " + (ok ? "success" : "error");
 }
 
 function showGa4CheckMessages(messages) {
-  const el = document.getElementById("ga4CheckMessages");
+  var el = document.getElementById("ga4CheckMessages");
+  if (!el) return;
   if (messages && messages.length) {
     el.textContent = messages.join("\n");
     el.className = "ga4-check-messages visible";
@@ -259,7 +463,7 @@ function getGa4FormValues() {
 }
 
 function fillGa4Form(config) {
-  const g = config.ga4;
+  var g = config.ga4;
   document.getElementById("ga4Enabled").checked = g.enabled;
   document.getElementById("ga4PropertyId").value = g.property_id || "";
   document.getElementById("ga4CredentialsPath").value = g.credentials_path || "";
@@ -277,24 +481,47 @@ function fillGa4Form(config) {
     setGa4ConfigStatus(false, "未配置");
   }
 
-  setGa4CredsStatus(config.credentials_exists, config.credentials_exists ? "凭证文件存在" : "凭证文件不存在");
+  setGa4CredsStatus(config.credentials_exists,
+    config.credentials_exists ? "凭证文件存在" : "凭证文件不存在");
+}
+
+async function updateGa4DashboardCard() {
+  try {
+    var config = await apiJson("/api/config/ga4");
+    var g = config.ga4;
+    var ds = document.getElementById("dsGa4Status");
+    if (!ds) return;
+
+    if (!g.enabled || !g.property_id) {
+      ds.textContent = "未配置";
+      ds.className = "sc-value sc-fail";
+    } else if (!config.credentials_exists) {
+      ds.textContent = "凭证缺失";
+      ds.className = "sc-value sc-warn";
+    } else {
+      ds.textContent = "已就绪";
+      ds.className = "sc-value sc-ok";
+    }
+  } catch (e) {
+    // silently ignore
+  }
 }
 
 async function loadGa4Config() {
   try {
-    const config = await apiJson("/api/config/ga4");
+    var config = await apiJson("/api/config/ga4");
     fillGa4Form(config);
     setGa4UploadMsg(true, "配置已加载。");
   } catch (error) {
     setGa4ConfigStatus(false, "加载失败");
-    setGa4UploadMsg(false, `加载失败: ${error.message}`);
+    setGa4UploadMsg(false, "加载失败: " + error.message);
   }
 }
 
 async function saveGa4Config() {
-  const payload = getGa4FormValues();
+  var payload = getGa4FormValues();
   try {
-    const result = await apiJson("/api/config/ga4", {
+    var result = await apiJson("/api/config/ga4", {
       method: "POST",
       body: JSON.stringify(payload),
     });
@@ -304,70 +531,171 @@ async function saveGa4Config() {
       credentials_exists: result.credentials_exists,
     });
     setGa4UploadMsg(true, "配置已保存到 config/api_sources.yaml。");
+    updateGa4DashboardCard();
   } catch (error) {
-    setGa4UploadMsg(false, `保存失败: ${error.message}`);
+    setGa4UploadMsg(false, "保存失败: " + error.message);
   }
 }
 
 async function uploadGa4Credentials() {
-  const fileInput = document.getElementById("ga4CredentialsFile");
-  const file = fileInput.files[0];
+  var fileInput = document.getElementById("ga4CredentialsFile");
+  var file = fileInput.files[0];
   if (!file) {
     setGa4UploadMsg(false, "请先选择一个 .json 文件。");
     return;
   }
 
-  const formData = new FormData();
+  var formData = new FormData();
   formData.append("file", file);
-
   setGa4UploadMsg(true, "上传中...");
 
   try {
-    const response = await fetch("/api/config/ga4/upload-credentials", {
+    var response = await fetch("/api/config/ga4/upload-credentials", {
       method: "POST",
       body: formData,
     });
-
-    const data = await response.json();
+    var data = await response.json();
     if (!response.ok) {
-      throw new Error(data.detail || `HTTP ${response.status}`);
+      throw new Error(data.detail || "HTTP " + response.status);
     }
-
     document.getElementById("ga4CredentialsPath").value = data.path;
     setGa4CredsStatus(true, "凭证文件存在");
     setGa4UploadMsg(true, "上传成功。");
     fileInput.value = "";
+    updateGa4DashboardCard();
   } catch (error) {
-    setGa4UploadMsg(false, `上传失败: ${error.message}`);
+    setGa4UploadMsg(false, "上传失败: " + error.message);
   }
 }
 
 async function checkGa4Config() {
   showGa4CheckMessages(["检查中..."]);
   try {
-    const result = await apiJson("/api/config/ga4/check", { method: "POST" });
+    var result = await apiJson("/api/config/ga4/check", { method: "POST" });
     showGa4CheckMessages(result.messages);
     setGa4ConfigStatus(result.ok, result.ok ? "检查通过" : "检查未通过");
   } catch (error) {
-    showGa4CheckMessages([`检查失败: ${error.message}`]);
+    showGa4CheckMessages(["检查失败: " + error.message]);
     setGa4ConfigStatus(false, "检查失败");
   }
 }
 
-// ---------------------------------------------------------------------------
+async function fetchGa4WithSave() {
+  if (isRunning) return;
+
+  showGa4CheckMessages(["正在保存配置..."]);
+  try {
+    var payload = getGa4FormValues();
+    var saveResult = await apiJson("/api/config/ga4", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+    fillGa4Form({
+      exists: true,
+      ga4: saveResult.ga4,
+      credentials_exists: saveResult.credentials_exists,
+    });
+    showGa4CheckMessages(["配置已保存。", "正在拉取 GA4 API..."]);
+    updateGa4DashboardCard();
+  } catch (error) {
+    showGa4CheckMessages(["保存配置失败: " + error.message, "请先保存配置再拉取。"]);
+    setGa4UploadMsg(false, "保存失败: " + error.message);
+    return;
+  }
+
+  await runStep("fetch_ga4_api");
+}
+
+// ===================================================================
+// Event binding
+// ===================================================================
+
+function bindEvents() {
+  // Sidebar navigation
+  document.querySelectorAll(".sidebar-item").forEach(function (item) {
+    item.addEventListener("click", function () {
+      navigateTo(item.getAttribute("data-page"));
+    });
+  });
+
+  // Refresh status
+  if (refreshStatusBtn) {
+    refreshStatusBtn.addEventListener("click", refreshStatus);
+  }
+  if (projectSelect) {
+    projectSelect.addEventListener("change", refreshStatus);
+  }
+
+  // runPipelineBtn (may appear multiple times)
+  document.querySelectorAll('[id="runPipelineBtn"]').forEach(function (btn) {
+    btn.addEventListener("click", function () { runStep("run_real_pipeline"); });
+  });
+
+  // Action buttons (data-step)
+  document.querySelectorAll(".action-button[data-step]").forEach(function (btn) {
+    btn.addEventListener("click", function () { runStep(btn.dataset.step); });
+  });
+
+  // Preview buttons (data-type)
+  document.querySelectorAll(".preview-button[data-type]").forEach(function (btn) {
+    btn.addEventListener("click", function () { readFile(btn.dataset.type); });
+  });
+
+  // Tab buttons
+  document.querySelectorAll(".tabs .tab-btn").forEach(function (btn) {
+    btn.addEventListener("click", function () {
+      var group = btn.closest(".tabs");
+      var groupName = group ? group.getAttribute("data-tab-group") : null;
+      var tabName = btn.getAttribute("data-tab");
+      if (groupName && tabName) switchTab(groupName, tabName);
+    });
+  });
+
+  // GA4 config buttons (only bind if they exist)
+  function bindGa4Btn(id, handler) {
+    var el = document.getElementById(id);
+    if (el) el.addEventListener("click", handler);
+  }
+  bindGa4Btn("ga4LoadBtn", loadGa4Config);
+  bindGa4Btn("ga4SaveBtn", saveGa4Config);
+  bindGa4Btn("ga4CheckBtn", checkGa4Config);
+  bindGa4Btn("ga4UploadBtn", uploadGa4Credentials);
+  bindGa4Btn("ga4FetchBtn", fetchGa4WithSave);
+}
+
+// ===================================================================
+// Today label
+// ===================================================================
+
+function setTodayLabel() {
+  var el = document.getElementById("todayLabel");
+  if (!el) return;
+  var d = new Date();
+  el.textContent =
+    "今日 " +
+    d.getFullYear() +
+    "-" +
+    String(d.getMonth() + 1).padStart(2, "0") +
+    "-" +
+    String(d.getDate()).padStart(2, "0");
+}
+
+// ===================================================================
 // Init
-// ---------------------------------------------------------------------------
+// ===================================================================
 
 async function init() {
   bindEvents();
-  setRunState("idle", "Idle");
+  setTodayLabel();
+  setRunState("unknown", "Idle");
+  setQuickStatus("idle", "就绪");
 
   try {
     await loadProjects();
     await refreshStatus();
     loadGa4Config();
   } catch (error) {
-    setRunState("failed", "Init failed");
+    setQuickStatus("fail", "Init failed");
     setText("stderrBox", error.message);
   }
 }
