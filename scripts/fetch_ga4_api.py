@@ -131,11 +131,11 @@ def load_config() -> dict[str, Any] | None:
     return loaded
 
 
-def resolve_local_path(raw_path: str) -> Path:
-    """支持绝对路径、~ 路径，以及相对仓库根目录的路径。"""
+def resolve_local_path(raw_path: str, base_path: Path | None = None) -> Path:
+    """支持绝对路径、~ 路径，以及相对 base_path（默认为仓库根目录）的路径。"""
     path = Path(raw_path).expanduser()
     if not path.is_absolute():
-        path = PROJECT_ROOT / path
+        path = (base_path or PROJECT_ROOT) / path
     return path
 
 
@@ -283,7 +283,7 @@ def main() -> None:
         print("ERROR: ga4.credentials_path is required.")
         return
 
-    credentials_path = resolve_local_path(credentials_path_text)
+    credentials_path = resolve_local_path(credentials_path_text, base_path=paths["project_root"])
     if not credentials_path.exists():
         print(f"ERROR: GA4 credentials file does not exist: {credentials_path}")
         return

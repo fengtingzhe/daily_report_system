@@ -59,6 +59,8 @@ def get_project_paths(project_id: str | None) -> dict[str, Any]:
         "tableau_dir": project_root / "tableau",
         "logs_dir": project_root / "logs",
         "temp_dir": project_root / "temp",
+        "secrets_dir": project_root / "secrets",
+        "ga4_credentials_path": project_root / "secrets" / "ga4-service-account.json",
     }
 
 
@@ -81,6 +83,7 @@ def ensure_project_dirs(project_id: str | None) -> dict[str, Any]:
         "tableau_dir",
         "logs_dir",
         "temp_dir",
+        "secrets_dir",
     ]:
         paths[key].mkdir(parents=True, exist_ok=True)
     return paths

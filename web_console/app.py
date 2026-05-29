@@ -26,6 +26,7 @@ sys.path.insert(0, str(PROJECT_ROOT))
 from scripts.utils.project_paths import (  # noqa: E402
     ensure_project_dirs,
     get_project_paths,
+    get_project_root,
     load_project_config,
     normalize_project_id,
 )
@@ -361,7 +362,6 @@ def api_init_project(payload: InitProjectRequest) -> dict[str, Any]:
 # ---------------------------------------------------------------------------
 
 GA4_CONFIG_PATH = PROJECT_ROOT / "config" / "api_sources.yaml"
-GA4_CREDENTIALS_PATH = PROJECT_ROOT / "secrets" / "ga4-service-account.json"
 GA4_DEFAULT_CONFIG: dict[str, Any] = {
     "enabled": False,
     "property_id": "",
@@ -374,6 +374,11 @@ GA4_DEFAULT_CONFIG: dict[str, Any] = {
         "event_daily": True,
     },
 }
+
+
+def _ga4_credentials_path(project_id: str) -> Path:
+    return get_project_root(project_id) / "secrets" / "ga4-service-account.json"
+
 
 
 def _read_api_sources() -> dict[str, Any]:
@@ -398,7 +403,10 @@ def _write_api_sources(data: dict[str, Any]) -> None:
 
 
 @app.get("/api/config/ga4")
-def api_get_ga4_config() -> dict[str, Any]:
+def api_get_ga4_config(project: str = Query(default="default")) -> dict[str, Any]:
+    project_id = validate_project_id(project)
+    cred_path = _ga4_credentials_path(project_id)
+
     data = _read_api_sources()
     ga4 = data.get("ga4", {})
     if not isinstance(ga4, dict):
@@ -426,14 +434,16 @@ def api_get_ga4_config() -> dict[str, Any]:
                 ),
             },
         },
-        "credentials_exists": GA4_CREDENTIALS_PATH.exists(),
+        "credentials_exists": cred_path.exists(),
         "config_path": relative_path(GA4_CONFIG_PATH),
     }
     return config
 
 
 @app.post("/api/config/ga4")
-def api_save_ga4_config(payload: Ga4ConfigRequest) -> dict[str, Any]:
+def api_save_ga4_config(payload: Ga4ConfigRequest, project: str = Query(default="default")) -> dict[str, Any]:
+    project_id = validate_project_id(project)
+    cred_path = _ga4_credentials_path(project_id)
     data = _read_api_sources()
 
     data["ga4"] = {
@@ -454,13 +464,19 @@ def api_save_ga4_config(payload: Ga4ConfigRequest) -> dict[str, Any]:
     return {
         "ok": True,
         "ga4": data["ga4"],
-        "credentials_exists": GA4_CREDENTIALS_PATH.exists(),
+        "credentials_exists": cred_path.exists(),
         "config_path": relative_path(GA4_CONFIG_PATH),
     }
 
 
 @app.post("/api/config/ga4/upload-credentials")
-async def api_upload_ga4_credentials(file: UploadFile = File(...)) -> dict[str, Any]:
+async def api_upload_ga4_credentials(
+    project: str = Query(default="default"),
+    file: UploadFile = File(...),
+) -> dict[str, Any]:
+    project_id = validate_project_id(project)
+    target = _ga4_credentials_path(project_id)
+
     if not file.filename or not file.filename.lower().endswith(".json"):
         raise HTTPException(status_code=400, detail="Only .json files are allowed.")
 
@@ -473,17 +489,20 @@ async def api_upload_ga4_credentials(file: UploadFile = File(...)) -> dict[str, 
     except json.JSONDecodeError as exc:
         raise HTTPException(status_code=400, detail=f"Invalid JSON file: {exc}") from exc
 
-    GA4_CREDENTIALS_PATH.parent.mkdir(parents=True, exist_ok=True)
-    GA4_CREDENTIALS_PATH.write_bytes(content)
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_bytes(content)
 
     return {
         "ok": True,
-        "path": relative_path(GA4_CREDENTIALS_PATH),
+        "path": relative_path(target),
     }
 
 
 @app.post("/api/config/ga4/check")
-def api_check_ga4_config() -> dict[str, Any]:
+def api_check_ga4_config(project: str = Query(default="default")) -> dict[str, Any]:
+    project_id = validate_project_id(project)
+    project_root = get_project_root(project_id)
+
     messages: list[str] = []
     ok = True
 
@@ -514,7 +533,10 @@ def api_check_ga4_config() -> dict[str, Any]:
         messages.append("credentials_path is empty.")
         ok = False
     else:
-        cred_path = PROJECT_ROOT / credentials_path_text
+        # Resolve relative credentials_path against project root
+        cred_path = Path(credentials_path_text)
+        if not cred_path.is_absolute():
+            cred_path = project_root / credentials_path_text
         if not cred_path.exists():
             messages.append(f"Credentials file not found: {credentials_path_text}")
             ok = False

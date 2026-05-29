@@ -26,6 +26,7 @@ CLEAN_DIR_KEYS = [
     "raw_dir",
     "clean_dir",
     "mart_dir",
+    "tableau_datasource_dir",
     "ai_context_dir",
     "ai_draft_dir",
     "pdf_dir",
