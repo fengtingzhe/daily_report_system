@@ -58,6 +58,7 @@ def get_project_paths(project_id: str | None) -> dict[str, Any]:
         "email_dir": project_root / "reports" / "email",
         "tableau_dir": project_root / "tableau",
         "logs_dir": project_root / "logs",
+        "temp_dir": project_root / "temp",
     }
 
 
@@ -79,6 +80,7 @@ def ensure_project_dirs(project_id: str | None) -> dict[str, Any]:
         "email_dir",
         "tableau_dir",
         "logs_dir",
+        "temp_dir",
     ]:
         paths[key].mkdir(parents=True, exist_ok=True)
     return paths

@@ -1,142 +1,157 @@
 """
-Clean test/temporary data from the daily_report_system project.
-Safely removes: raw/clean/mart CSVs, AI context/drafts, PDFs, logs.
-Preserves: .gitkeep files, scripts, configs, web_console, tableau templates, secrets.
+Clean test/temporary data from project directories.
+
+Usage:
+  python scripts/clean_test_data.py --dry-run                # Preview only
+  python scripts/clean_test_data.py --confirm                # Delete after preview
+  python scripts/clean_test_data.py --dry-run --confirm      # Preview then delete
+  python scripts/clean_test_data.py --project myproj --confirm
 """
-import os
+
+from __future__ import annotations
+
+import argparse
+import sys
 from pathlib import Path
 
-PROJECT_ROOT = Path(__file__).resolve().parent.parent
-os.chdir(str(PROJECT_ROOT))
+# Ensure scripts/utils is importable when run from repo root
+_SCRIPT_DIR = Path(__file__).resolve().parent
+if str(_SCRIPT_DIR) not in sys.path:
+    sys.path.insert(0, str(_SCRIPT_DIR))
 
-# ------------------------------
-# Phase 1: Collect files to delete
-# ------------------------------
+from utils.project_paths import get_project_paths, add_project_arg, PROJECT_ROOT
 
-DELETE_TARGETS = []
 
-def add_glob(pattern, excludes=None):
-    """Collect files matching a glob pattern, excluding listed names."""
-    excludes = excludes or []
-    for p in Path().glob(pattern):
-        if p.is_file() and p.name not in excludes:
-            DELETE_TARGETS.append(p)
+CLEAN_DIR_KEYS = [
+    "raw_dir",
+    "clean_dir",
+    "mart_dir",
+    "ai_context_dir",
+    "ai_draft_dir",
+    "pdf_dir",
+    "email_dir",
+    "logs_dir",
+    "temp_dir",
+]
 
-def add_rglob(directory, glob_pattern, excludes=None):
-    """Recursively collect files in directory matching pattern."""
-    excludes = excludes or []
-    d = Path(directory)
-    if not d.exists():
+
+def collect_targets(paths: dict) -> list[Path]:
+    """Recursively collect all deletable files under clean-target directories.
+
+    Skips .gitkeep files and directories that do not exist.
+    """
+    targets: list[Path] = []
+    for key in CLEAN_DIR_KEYS:
+        d = paths[key]
+        if not d.exists():
+            continue
+        for f in d.rglob("*"):
+            if f.is_file() and f.name != ".gitkeep":
+                targets.append(f)
+    return sorted(targets)
+
+
+def print_header(title: str) -> None:
+    print()
+    print("=" * 60)
+    print(f"  {title}")
+    print("=" * 60)
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(
+        description="Clean test/temporary data from project directories"
+    )
+    add_project_arg(parser)
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Preview files that would be deleted (no deletion)",
+    )
+    parser.add_argument(
+        "--confirm",
+        action="store_true",
+        help="Actually delete files. Required for any deletion.",
+    )
+    args = parser.parse_args()
+
+    paths = get_project_paths(args.project)
+    project_id = paths["project_id"]
+
+    # --- Collect ---
+    targets = collect_targets(paths)
+
+    print_header(f"Clean Test Data — project={project_id}")
+    print(f"  Project root: {PROJECT_ROOT}")
+    print(f"  Target dirs:  {len(CLEAN_DIR_KEYS)}")
+    print(f"  Files found:  {len(targets)}")
+
+    if not targets:
+        print("\nNo test/temp files found. Project is already clean.")
         return
-    for p in d.rglob(glob_pattern):
-        if p.is_file() and p.name not in excludes:
-            DELETE_TARGETS.append(p)
 
-# 1. Raw data CSVs (keep .gitkeep)
-add_rglob("projects/default/data/raw", "*.csv")
+    # --- Preview ---
+    print("\nFiles that would be deleted:")
+    for i, f in enumerate(targets, 1):
+        try:
+            rel = f.relative_to(PROJECT_ROOT)
+        except ValueError:
+            rel = f
+        print(f"  [{i:03d}] {rel}")
 
-# 2. Clean data CSVs (keep .gitkeep)
-add_rglob("projects/default/data/clean", "*.csv")
+    # --- Safety: require --confirm to delete ---
+    if not args.confirm:
+        print()
+        print("-" * 60)
+        print("  DRY RUN — no files were deleted.")
+        if not args.dry_run:
+            print("  Re-run with --confirm to delete, or --dry-run for explicit preview.")
+        print("-" * 60)
+        return
 
-# 3. Mart data CSVs (keep .gitkeep)
-add_rglob("projects/default/data/mart", "*.csv")
+    if args.dry_run:
+        print()
+        print("-" * 60)
+        print("  DRY RUN (--dry-run + --confirm) — still preview only.")
+        print("  Remove --dry-run and keep --confirm to actually delete.")
+        print("-" * 60)
+        return
 
-# 4. AI context JSON files (keep .gitkeep)
-add_rglob("ai/context", "*.json")
+    # --- Delete ---
+    print()
+    print("Deleting...")
 
-# 5. AI draft MD files (keep .gitkeep)
-add_rglob("ai/draft", "*.md")
+    deleted: list[Path] = []
+    skipped: list[Path] = []
+    errors: list[tuple[Path, str]] = []
 
-# 6. PDF reports (keep .gitkeep)
-add_rglob("reports", "*.pdf")
+    for f in targets:
+        try:
+            f.unlink()
+            deleted.append(f)
+            print(f"  DELETED  {f.relative_to(PROJECT_ROOT)}")
+        except PermissionError:
+            skipped.append(f)
+            print(f"  SKIPPED  {f.relative_to(PROJECT_ROOT)} (permission)")
+        except Exception as exc:
+            errors.append((f, str(exc)))
+            print(f"  ERROR    {f.relative_to(PROJECT_ROOT)} — {exc}")
 
-# 7. Log files (keep .gitkeep)
-add_rglob("logs", "*.log")
+    # --- Summary ---
+    print_header("Summary")
+    print(f"  Deleted: {len(deleted)}")
+    print(f"  Skipped: {len(skipped)}")
+    print(f"  Errors:  {len(errors)}")
 
-# 8. temp directory — nothing beyond .gitkeep, skip
-# 9. archive directory — only .gitkeep, skip (user said optional)
+    if errors:
+        print("\nErrors:")
+        for f, msg in errors:
+            print(f"  {f.relative_to(PROJECT_ROOT)} — {msg}")
 
-# ------------------------------
-# Phase 2: Safety check
-# ------------------------------
+    if not errors:
+        print()
+        print("  Project is CLEAN — all test data removed.")
 
-print("=" * 60)
-print("  Daily Report System — Clean Test Data")
-print("=" * 60)
-print(f"  Project root: {PROJECT_ROOT}")
-print(f"  Files to delete: {len(DELETE_TARGETS)}")
-print("=" * 60)
 
-if not DELETE_TARGETS:
-    print("\nNo test/temp files found. Project is already clean.")
-    exit(0)
-
-print("\nFiles to be deleted:")
-for i, f in enumerate(sorted(DELETE_TARGETS), 1):
-    print(f"  [{i:02d}] {f}")
-
-# Security: ensure all paths are within the project root
-for f in DELETE_TARGETS:
-    abs_path = f.resolve()
-    if not str(abs_path).startswith(str(PROJECT_ROOT.resolve())):
-        print(f"\nERROR: Path outside project root — {abs_path}")
-        exit(1)
-
-# ------------------------------
-# Phase 3: Confirm and delete
-# ------------------------------
-
-print(f"\nProceed with deletion? (y/n): ", end="")
-answer = input().strip().lower()
-if answer not in ("y", "yes"):
-    print("Aborted.")
-    exit(0)
-
-deleted = []
-errors = []
-
-for f in DELETE_TARGETS:
-    try:
-        f.unlink()
-        deleted.append(f)
-        print(f"  DELETED: {f}")
-    except Exception as e:
-        errors.append((f, e))
-        print(f"  ERROR: {f} — {e}")
-
-# ------------------------------
-# Phase 4: Summary
-# ------------------------------
-
-print("\n" + "=" * 60)
-print("  SUMMARY")
-print("=" * 60)
-print(f"  Deleted: {len(deleted)} files")
-print(f"  Errors:  {len(errors)}")
-
-if errors:
-    print("\nErrors:")
-    for f, e in errors:
-        print(f"  {f} — {e}")
-
-# Verify project cleanliness
-remaining = []
-for pattern in ["projects/default/data/raw/**/*.csv",
-                "projects/default/data/clean/**/*.csv",
-                "projects/default/data/mart/**/*.csv",
-                "ai/context/*.json",
-                "ai/draft/*.md",
-                "reports/**/*.pdf",
-                "logs/*.log"]:
-    for p in Path().glob(pattern):
-        if p.is_file():
-            remaining.append(p)
-
-if remaining:
-    print(f"\nRemaining test files ({len(remaining)}):")
-    for f in remaining:
-        print(f"  {f}")
-else:
-    print(f"\n{'=' * 60}")
-    print("  Project is CLEAN — all test data removed.")
-    print(f"{'=' * 60}")
+if __name__ == "__main__":
+    main()

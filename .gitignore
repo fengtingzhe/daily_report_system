@@ -46,6 +46,7 @@ projects/*/ai/draft/*.md
 projects/*/reports/pdf/**
 projects/*/reports/email/**
 projects/*/logs/*.log
+projects/*/temp/**
 
 !projects/**/.gitkeep
 !projects/*/project.yaml
