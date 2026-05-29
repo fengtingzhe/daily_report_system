@@ -17,8 +17,9 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
 REQUIRED_GITIGNORE_PATTERNS = [
-    "secrets/",
+    "config/api_keys.yaml",
     "config/api_sources.yaml",
+    "secrets/",
     "data/",
     "ai/",
     "reports/",
@@ -52,18 +53,38 @@ LEGACY_ROOT_DIRS = [
 ALLOWED_ROOT_BATS = {"open_web_console.bat"}
 
 DANGEROUS_PATH_PATTERNS = [
-    "secrets/",
+    # Sensitive config files — must never appear in git status
+    "config/api_keys.yaml",
     "config/api_sources.yaml",
-    "/data/raw/",
-    "/data/clean/",
-    "/data/mart/",
-    "/data/tableau_datasource/",
-    "/ai/context/",
-    "/ai/draft/",
-    "/reports/pdf/",
-    "/reports/email/",
-    "/logs/",
-    "/temp/",
+    # Secrets
+    "secrets/",
+    "projects/*/secrets/",
+    # Root legacy dirs — broad match catches both root and project paths
+    "data/raw/",
+    "data/clean/",
+    "data/mart/",
+    "data/tableau_datasource/",
+    "ai/context/",
+    "ai/draft/",
+    "reports/pdf/",
+    "reports/email/",
+    "archive/",
+    # Broad legacy dir names
+    "data/",
+    "ai/",
+    "reports/",
+    "logs/",
+    "temp/",
+    # Project-level paths (suffixed with / to avoid prefix-only false matches)
+    "projects/*/data/raw/",
+    "projects/*/data/clean/",
+    "projects/*/data/mart/",
+    "projects/*/data/tableau_datasource/",
+    "projects/*/ai/context/",
+    "projects/*/ai/draft/",
+    "projects/*/reports/",
+    "projects/*/logs/",
+    "projects/*/temp/",
 ]
 
 # ANSI

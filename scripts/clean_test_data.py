@@ -2,10 +2,14 @@
 Clean test/temporary data from project directories.
 
 Usage:
-  python scripts/clean_test_data.py --dry-run                # Preview only
-  python scripts/clean_test_data.py --confirm                # Delete after preview
-  python scripts/clean_test_data.py --dry-run --confirm      # Preview then delete
-  python scripts/clean_test_data.py --project myproj --confirm
+  python scripts/clean_test_data.py --dry-run --project default
+  python scripts/clean_test_data.py --confirm --project default
+  python scripts/clean_test_data.py --dry-run --project myproj
+  python scripts/clean_test_data.py --confirm --project myproj
+
+--dry-run   Preview files that would be deleted (no deletion).
+--confirm   Actually delete files. Required for any deletion.
+            dry-run always wins; no files are deleted when --dry-run is present.
 """
 
 from __future__ import annotations
