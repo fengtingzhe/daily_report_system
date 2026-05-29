@@ -186,6 +186,80 @@ body {
   margin-top: 8px;
 }
 
+/* ---- Sidebar toggle button ---- */
+
+.sidebar-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  margin: 8px auto;
+  padding: 0;
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: var(--radius-sm);
+  background: rgba(255,255,255,0.04);
+  color: var(--sidebar-text);
+  font-size: 12px;
+  cursor: pointer;
+  transition: background-color 0.15s;
+}
+
+.sidebar-toggle:hover {
+  background: var(--sidebar-hover);
+  color: var(--sidebar-active);
+}
+
+/* ---- Sidebar collapsed state ---- */
+
+.app-shell.sidebar-collapsed {
+  --sidebar-w: 72px;
+}
+
+.app-shell.sidebar-collapsed .sidebar-brand h1,
+.app-shell.sidebar-collapsed .sidebar-brand p {
+  display: none;
+}
+
+.app-shell.sidebar-collapsed .sidebar-brand {
+  padding: 16px 8px;
+  text-align: center;
+}
+
+.app-shell.sidebar-collapsed .sidebar-nav {
+  padding: 8px 0;
+}
+
+.app-shell.sidebar-collapsed .sidebar-item {
+  justify-content: center;
+  padding: 10px 8px;
+  margin: 0 6px 2px;
+  font-size: 0;
+  gap: 0;
+}
+
+.app-shell.sidebar-collapsed .sidebar-item .nav-icon {
+  font-size: 18px;
+  width: auto;
+  opacity: 0.85;
+}
+
+.app-shell.sidebar-collapsed .sidebar-footer {
+  padding: 12px 8px;
+  margin: 0 6px;
+}
+
+.app-shell.sidebar-collapsed .sidebar-footer .project-badge > div,
+.app-shell.sidebar-collapsed .sidebar-footer .project-name,
+.app-shell.sidebar-collapsed .sidebar-footer .project-id,
+.app-shell.sidebar-collapsed .sidebar-badge {
+  display: none;
+}
+
+.app-shell.sidebar-collapsed .sidebar-toggle {
+  margin: 8px auto;
+}
+
 /* ===================================================================
    Main content area
    =================================================================== */

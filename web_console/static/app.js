@@ -11,6 +11,60 @@ let isRunning = false;
 let taskHistory = [];
 let lastResult = null;
 
+// ===================================================================
+// Sidebar toggle
+// ===================================================================
+
+(function () {
+  var SIDEBAR_KEY = "drs_sidebar_collapsed";
+
+  function applyState(collapsed) {
+    var shell = document.querySelector(".app-shell");
+    var toggle = document.getElementById("sidebarToggle");
+    if (!shell || !toggle) return;
+    if (collapsed) {
+      shell.classList.add("sidebar-collapsed");
+      toggle.innerHTML = "&#9654;";
+      toggle.title = "展开侧边栏";
+    } else {
+      shell.classList.remove("sidebar-collapsed");
+      toggle.innerHTML = "&#9664;";
+      toggle.title = "收起侧边栏";
+    }
+  }
+
+  function restoreSidebar() {
+    try {
+      var stored = localStorage.getItem(SIDEBAR_KEY);
+      applyState(stored === "1");
+    } catch (e) {
+      applyState(false);
+    }
+  }
+
+  function toggleSidebar() {
+    var shell = document.querySelector(".app-shell");
+    if (!shell) return;
+    var collapsed = !shell.classList.contains("sidebar-collapsed");
+    applyState(collapsed);
+    try { localStorage.setItem(SIDEBAR_KEY, collapsed ? "1" : "0"); } catch (e) {}
+  }
+
+  // Defer binding until DOM is ready
+  document.addEventListener("DOMContentLoaded", function () {
+    var btn = document.getElementById("sidebarToggle");
+    if (btn) btn.addEventListener("click", toggleSidebar);
+    restoreSidebar();
+  });
+
+  // Also try to restore immediately if DOM is already interactive
+  if (document.readyState !== "loading") {
+    var btn = document.getElementById("sidebarToggle");
+    if (btn) btn.addEventListener("click", toggleSidebar);
+    restoreSidebar();
+  }
+})();
+
 const stepLabels = {
   fetch_ga4_api: "拉取 GA4 API",
   import_raw_csv: "导入原始 CSV",
@@ -253,6 +307,7 @@ function updateProjectMeta() {
   // Sidebar project card
   setText("sidebarProjectName", pn || "Cube Match");
   setText("sidebarProjectId", selectedProject());
+  setText("settingsProjectId", selectedProject());
   var icon = document.getElementById("sidebarProjectIcon");
   if (icon) icon.textContent = (pn || "C").charAt(0).toUpperCase();
 }
@@ -274,6 +329,26 @@ function updateStatusView(status) {
   setTextAll("rawUnityPath", (status.paths.raw_unity || "") + "/");
   setTextAll("rawApplovinPath", (status.paths.raw_applovin || "") + "/");
   setTextAll("rawGa4Path", (status.paths.raw_ga4 || "") + "/");
+
+  // Settings paths page
+  setText("settingsRawUnityPath", (status.paths.raw_unity || "") + "/");
+  setText("settingsRawApplovinPath", (status.paths.raw_applovin || "") + "/");
+  setText("settingsRawGa4Path", (status.paths.raw_ga4 || "") + "/");
+  setText("settingsCleanPath", (status.paths.clean || "") + "/");
+  setText("settingsMartPath", (status.paths.mart || "") + "/");
+  setText("settingsTableauPath", (status.paths.tableau_datasource || "") + "/");
+  setText("settingsAiContextPath", (status.paths.ai_context || "") + "/");
+  setText("settingsAiDraftPath", (status.paths.ai_draft || "") + "/");
+  setText("settingsPdfPath", (status.paths.pdf || "") + "/");
+  setText("settingsLogsPath", "projects/" + status.project_id + "/logs/");
+  setText("settingsTempPath", "projects/" + status.project_id + "/temp/");
+
+  // Secrets status
+  var secEl = document.getElementById("settingsSecretsStatus");
+  if (secEl) {
+    secEl.textContent = "(check via GA4 config check)";
+    secEl.className = "badge-sm warn";
+  }
 
   setTextAll("latestPdf", status.latest_files.latest_pdf || "-");
   setTextAll("latestLog", status.latest_files.latest_log || "-");
@@ -462,16 +537,36 @@ function getGa4FormValues() {
   };
 }
 
+function updateGa4IngestionStatus(config) {
+  var g = config.ga4;
+  setText("ga4StatusPropertyId", g.property_id || "(未设置)");
+  setText("ga4StatusCredentials", g.credentials_path || "(未设置)");
+  setText("ga4StatusDateRange", (g.start_date || "-") + " → " + (g.end_date || "-"));
+  var reports = [];
+  if (g.reports.daily_overview) reports.push("daily_overview");
+  if (g.reports.country_platform_daily) reports.push("country_platform_daily");
+  if (g.reports.event_daily) reports.push("event_daily");
+  setText("ga4StatusReports", reports.length ? reports.join(", ") : "(无)");
+}
+
 function fillGa4Form(config) {
   var g = config.ga4;
-  document.getElementById("ga4Enabled").checked = g.enabled;
-  document.getElementById("ga4PropertyId").value = g.property_id || "";
-  document.getElementById("ga4CredentialsPath").value = g.credentials_path || "";
-  document.getElementById("ga4StartDate").value = g.start_date || "";
-  document.getElementById("ga4EndDate").value = g.end_date || "";
-  document.getElementById("ga4ReportDailyOverview").checked = g.reports.daily_overview;
-  document.getElementById("ga4ReportCountryPlatform").checked = g.reports.country_platform_daily;
-  document.getElementById("ga4ReportEventDaily").checked = g.reports.event_daily;
+  var enabledEl = document.getElementById("ga4Enabled");
+  if (enabledEl) enabledEl.checked = g.enabled;
+  var propIdEl = document.getElementById("ga4PropertyId");
+  if (propIdEl) propIdEl.value = g.property_id || "";
+  var credPathEl = document.getElementById("ga4CredentialsPath");
+  if (credPathEl) credPathEl.value = g.credentials_path || "";
+  var startEl = document.getElementById("ga4StartDate");
+  if (startEl) startEl.value = g.start_date || "";
+  var endEl = document.getElementById("ga4EndDate");
+  if (endEl) endEl.value = g.end_date || "";
+  var rdoEl = document.getElementById("ga4ReportDailyOverview");
+  if (rdoEl) rdoEl.checked = g.reports.daily_overview;
+  var rcpEl = document.getElementById("ga4ReportCountryPlatform");
+  if (rcpEl) rcpEl.checked = g.reports.country_platform_daily;
+  var redEl = document.getElementById("ga4ReportEventDaily");
+  if (redEl) redEl.checked = g.reports.event_daily;
 
   if (config.exists) {
     setGa4ConfigStatus(true, "配置文件存在");
@@ -483,6 +578,9 @@ function fillGa4Form(config) {
 
   setGa4CredsStatus(config.credentials_exists,
     config.credentials_exists ? "凭证文件存在" : "凭证文件不存在");
+
+  // Also update read-only GA4 status on Data Ingestion page
+  updateGa4IngestionStatus(config);
 }
 
 async function updateGa4DashboardCard() {
@@ -606,6 +704,29 @@ async function fetchGa4WithSave() {
   await runStep("fetch_ga4_api");
 }
 
+async function dashFetchGa4() {
+  if (isRunning) return;
+
+  // Check GA4 config status before running
+  try {
+    var config = await apiJson("/api/config/ga4");
+    var g = config.ga4;
+    if (!g.enabled || !g.property_id) {
+      showToast("请先在 项目与配置 > 数据源配置 中完成 GA4 配置", false);
+      return;
+    }
+    if (!config.credentials_exists) {
+      showToast("GA4 凭证文件缺失，请在 项目与配置 > 数据源配置 中上传", false);
+      return;
+    }
+  } catch (e) {
+    showToast("无法检查 GA4 配置状态", false);
+    return;
+  }
+
+  await runStep("fetch_ga4_api");
+}
+
 // ===================================================================
 // Event binding
 // ===================================================================
@@ -656,6 +777,10 @@ function bindEvents() {
     var el = document.getElementById(id);
     if (el) el.addEventListener("click", handler);
   }
+  // Dashboard GA4 fetch (with config check)
+  var dashFetchBtn = document.getElementById("dashFetchGa4Btn");
+  if (dashFetchBtn) dashFetchBtn.addEventListener("click", dashFetchGa4);
+
   bindGa4Btn("ga4LoadBtn", loadGa4Config);
   bindGa4Btn("ga4SaveBtn", saveGa4Config);
   bindGa4Btn("ga4CheckBtn", checkGa4Config);

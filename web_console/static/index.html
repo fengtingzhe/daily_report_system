@@ -41,6 +41,8 @@
           </li>
         </ul>
 
+        <button class="sidebar-toggle" id="sidebarToggle" title="收起侧边栏">◀</button>
+
         <div class="sidebar-footer">
           <div class="project-badge">
             <div class="project-icon" id="sidebarProjectIcon">C</div>
@@ -131,10 +133,8 @@
           <div class="panel">
             <div class="panel-heading"><h3>快捷操作</h3></div>
             <div class="action-grid">
-              <button class="action-button" data-step="fetch_ga4_api">拉取 GA4 API</button>
+              <button class="action-button" data-step="fetch_ga4_api" id="dashFetchGa4Btn">拉取 GA4 API</button>
               <button id="runPipelineBtn" class="primary-button">运行真实日报流程</button>
-              <button class="secondary-button" onclick="navigateTo('data-ingestion')">打开数据接入</button>
-              <button class="secondary-button" onclick="navigateTo('report-center')">打开日报中心</button>
             </div>
           </div>
 
@@ -200,13 +200,13 @@
             <button class="tab-btn" data-tab="history">接入历史</button>
           </div>
 
-          <!-- Tab: GA4 -->
+          <!-- Tab: GA4 (read-only status) -->
           <div class="tab-panel active" data-tab="ga4">
             <div class="panel">
               <div class="panel-heading">
                 <div>
-                  <h3>GA4 API 配置</h3>
-                  <p>配置 GA4 Data API 拉数参数。所有内容保存在本地，不上传。</p>
+                  <h3>GA4 API 状态</h3>
+                  <p>只读摘要。如需修改 GA4 配置，请前往 项目与配置 &gt; 数据源配置。</p>
                 </div>
                 <div class="ga4-status-row">
                   <span id="ga4ConfigStatus" class="ga4-status-badge unknown">未加载</span>
@@ -214,68 +214,18 @@
                 </div>
               </div>
 
-              <div class="ga4-form">
-                <div class="ga4-field">
-                  <label class="ga4-checkbox-label">
-                    <input type="checkbox" id="ga4Enabled" />
-                    <span>启用 GA4 API 拉数</span>
-                  </label>
-                </div>
+              <table style="margin-bottom:16px">
+                <tr><td style="color:var(--muted);width:140px">Property ID</td><td><strong id="ga4StatusPropertyId">-</strong></td></tr>
+                <tr><td style="color:var(--muted)">Credentials</td><td><code id="ga4StatusCredentials">-</code></td></tr>
+                <tr><td style="color:var(--muted)">Date Range</td><td><span id="ga4StatusDateRange">-</span></td></tr>
+                <tr><td style="color:var(--muted)">Reports</td><td><span id="ga4StatusReports">-</span></td></tr>
+              </table>
 
-                <div class="ga4-field">
-                  <label for="ga4PropertyId">Property ID</label>
-                  <input type="text" id="ga4PropertyId" placeholder="例如 123456789" class="ga4-input" />
-                </div>
+              <div id="ga4CheckMessages" class="ga4-check-messages"></div>
 
-                <div class="ga4-field">
-                  <label for="ga4CredentialsPath">Credentials Path</label>
-                  <input type="text" id="ga4CredentialsPath" placeholder="secrets/ga4-service-account.json" class="ga4-input" />
-                </div>
-
-                <div class="ga4-field">
-                  <label>服务账号 JSON</label>
-                  <div class="ga4-upload-row">
-                    <input type="file" id="ga4CredentialsFile" accept=".json" class="ga4-file-input" />
-                    <button id="ga4UploadBtn" class="secondary-button">上传服务账号 JSON</button>
-                  </div>
-                  <span id="ga4UploadMsg" class="ga4-hint"></span>
-                </div>
-
-                <div class="ga4-field-row">
-                  <div class="ga4-field">
-                    <label for="ga4StartDate">Start Date</label>
-                    <input type="text" id="ga4StartDate" placeholder="7daysAgo" class="ga4-input" />
-                  </div>
-                  <div class="ga4-field">
-                    <label for="ga4EndDate">End Date</label>
-                    <input type="text" id="ga4EndDate" placeholder="yesterday" class="ga4-input" />
-                  </div>
-                </div>
-
-                <fieldset class="ga4-reports-fieldset">
-                  <legend>Reports</legend>
-                  <label class="ga4-checkbox-label">
-                    <input type="checkbox" id="ga4ReportDailyOverview" checked />
-                    <span>daily_overview</span>
-                  </label>
-                  <label class="ga4-checkbox-label">
-                    <input type="checkbox" id="ga4ReportCountryPlatform" checked />
-                    <span>country_platform_daily</span>
-                  </label>
-                  <label class="ga4-checkbox-label">
-                    <input type="checkbox" id="ga4ReportEventDaily" checked />
-                    <span>event_daily</span>
-                  </label>
-                </fieldset>
-
-                <div id="ga4CheckMessages" class="ga4-check-messages"></div>
-
-                <div class="ga4-button-row">
-                  <button id="ga4LoadBtn" class="secondary-button">加载 GA4 配置</button>
-                  <button id="ga4SaveBtn" class="primary-button">保存 GA4 配置</button>
-                  <button id="ga4CheckBtn" class="secondary-button">检查 GA4 配置</button>
-                  <button id="ga4FetchBtn" class="action-button">拉取 GA4 API</button>
-                </div>
+              <div class="ga4-button-row">
+                <button id="ga4FetchBtn" class="action-button">拉取 GA4 API</button>
+                <button class="secondary-button" onclick="navigateTo('settings');setTimeout(function(){switchTab('settings','ga4-config')},100)">前往 GA4 配置</button>
               </div>
             </div>
           </div>
@@ -471,45 +421,152 @@
           </div>
 
           <div class="tabs" data-tab-group="settings">
-            <button class="tab-btn active" data-tab="project">项目管理</button>
-            <button class="tab-btn" data-tab="ga4-config">GA4 配置</button>
-            <button class="tab-btn" data-tab="system">系统配置</button>
+            <button class="tab-btn active" data-tab="project">项目信息</button>
+            <button class="tab-btn" data-tab="ga4-config">数据源配置</button>
+            <button class="tab-btn" data-tab="paths">系统路径</button>
+            <button class="tab-btn" data-tab="security">安全检查</button>
           </div>
 
-          <!-- Tab: Project -->
+          <!-- Tab: Project Info -->
           <div class="tab-panel active" data-tab="project">
             <div class="panel">
-              <div class="panel-heading"><h3>当前项目</h3></div>
+              <div class="panel-heading"><h3>项目基本信息</h3></div>
               <table>
-                <tr><td style="color:var(--muted);width:120px">项目 ID</td><td><strong><span id="settingsProjectId">default</span></strong></td></tr>
-                <tr><td style="color:var(--muted)">项目名</td><td><span id="projectName">-</span></td></tr>
+                <tr><td style="color:var(--muted);width:140px">项目 ID</td><td><strong><span id="settingsProjectId">default</span></strong></td></tr>
+                <tr><td style="color:var(--muted)">项目名称</td><td><span id="projectName">-</span></td></tr>
                 <tr><td style="color:var(--muted)">项目路径</td><td><code id="projectPath">-</code></td></tr>
+                <tr><td style="color:var(--muted)">时区</td><td>Asia/Shanghai</td></tr>
+                <tr><td style="color:var(--muted)">货币</td><td>USD</td></tr>
               </table>
             </div>
           </div>
 
-          <!-- Tab: GA4 Config (shortcut) -->
+          <!-- Tab: Data Source Config (GA4 form moved here) -->
           <div class="tab-panel" data-tab="ga4-config">
             <div class="panel">
               <div class="panel-heading">
                 <div>
-                  <h3>GA4 配置</h3>
-                  <p>与数据接入页面的 GA4 配置相同。</p>
+                  <h3>GA4 API 配置</h3>
+                  <p>配置 GA4 Data API 拉数参数。所有内容保存在本地，不上传。</p>
                 </div>
-                <button class="primary-button" onclick="navigateTo('data-ingestion');document.querySelector('[data-tab=ga4]').click()">打开数据接入 / GA4</button>
+                <div class="ga4-status-row">
+                  <span id="ga4ConfigStatus" class="ga4-status-badge unknown">未加载</span>
+                  <span id="ga4CredsStatus" class="ga4-status-badge unknown">凭证未检查</span>
+                </div>
               </div>
+
+              <div class="ga4-form">
+                <div class="ga4-field">
+                  <label class="ga4-checkbox-label">
+                    <input type="checkbox" id="ga4Enabled" />
+                    <span>启用 GA4 API 拉数</span>
+                  </label>
+                </div>
+
+                <div class="ga4-field">
+                  <label for="ga4PropertyId">Property ID</label>
+                  <input type="text" id="ga4PropertyId" placeholder="例如 123456789" class="ga4-input" />
+                </div>
+
+                <div class="ga4-field">
+                  <label for="ga4CredentialsPath">Credentials Path</label>
+                  <input type="text" id="ga4CredentialsPath" placeholder="secrets/ga4-service-account.json" class="ga4-input" />
+                </div>
+
+                <div class="ga4-field">
+                  <label>服务账号 JSON</label>
+                  <div class="ga4-upload-row">
+                    <input type="file" id="ga4CredentialsFile" accept=".json" class="ga4-file-input" />
+                    <button id="ga4UploadBtn" class="secondary-button">上传服务账号 JSON</button>
+                  </div>
+                  <span id="ga4UploadMsg" class="ga4-hint"></span>
+                </div>
+
+                <div class="ga4-field-row">
+                  <div class="ga4-field">
+                    <label for="ga4StartDate">Start Date</label>
+                    <input type="text" id="ga4StartDate" placeholder="7daysAgo" class="ga4-input" />
+                  </div>
+                  <div class="ga4-field">
+                    <label for="ga4EndDate">End Date</label>
+                    <input type="text" id="ga4EndDate" placeholder="yesterday" class="ga4-input" />
+                  </div>
+                </div>
+
+                <fieldset class="ga4-reports-fieldset">
+                  <legend>Reports</legend>
+                  <label class="ga4-checkbox-label">
+                    <input type="checkbox" id="ga4ReportDailyOverview" checked />
+                    <span>daily_overview</span>
+                  </label>
+                  <label class="ga4-checkbox-label">
+                    <input type="checkbox" id="ga4ReportCountryPlatform" checked />
+                    <span>country_platform_daily</span>
+                  </label>
+                  <label class="ga4-checkbox-label">
+                    <input type="checkbox" id="ga4ReportEventDaily" checked />
+                    <span>event_daily</span>
+                  </label>
+                </fieldset>
+
+                <div id="ga4CheckMessages" class="ga4-check-messages"></div>
+
+                <div class="ga4-button-row">
+                  <button id="ga4LoadBtn" class="secondary-button">加载 GA4 配置</button>
+                  <button id="ga4SaveBtn" class="primary-button">保存 GA4 配置</button>
+                  <button id="ga4CheckBtn" class="secondary-button">检查 GA4 配置</button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Unity / AppLovin placeholders -->
+            <div class="panel">
+              <div class="panel-heading"><h3>Unity Ads 配置</h3></div>
+              <p style="color:var(--muted);font-size:13px">即将支持。当前请通过 config/api_keys.example.yaml 模板手动配置。</p>
+            </div>
+            <div class="panel">
+              <div class="panel-heading"><h3>AppLovin 配置</h3></div>
+              <p style="color:var(--muted);font-size:13px">即将支持。当前请通过 config/api_keys.example.yaml 模板手动配置。</p>
             </div>
           </div>
 
-          <!-- Tab: System -->
-          <div class="tab-panel" data-tab="system">
+          <!-- Tab: System Paths -->
+          <div class="tab-panel" data-tab="paths">
             <div class="panel">
-              <div class="panel-heading"><h3>系统配置</h3></div>
+              <div class="panel-heading"><h3>项目路径</h3></div>
               <table>
-                <tr><td style="color:var(--muted);width:180px">DeepSeek AI</td><td><span class="badge-sm warn">暂未配置</span></td></tr>
-                <tr><td style="color:var(--muted)">SMTP 邮件</td><td><span class="badge-sm warn">Dry-run</span></td></tr>
-                <tr><td style="color:var(--muted)">Tableau 自动导出</td><td><span class="badge-sm warn">暂未启用</span></td></tr>
-                <tr><td style="color:var(--muted)">DuckDB</td><td><span class="badge-sm warn">未来计划</span></td></tr>
+                <tr><td style="color:var(--muted);width:160px">Raw Unity</td><td><code id="settingsRawUnityPath">-</code></td></tr>
+                <tr><td style="color:var(--muted)">Raw AppLovin</td><td><code id="settingsRawApplovinPath">-</code></td></tr>
+                <tr><td style="color:var(--muted)">Raw GA4</td><td><code id="settingsRawGa4Path">-</code></td></tr>
+                <tr><td style="color:var(--muted)">Clean</td><td><code id="settingsCleanPath">-</code></td></tr>
+                <tr><td style="color:var(--muted)">Mart</td><td><code id="settingsMartPath">-</code></td></tr>
+                <tr><td style="color:var(--muted)">Tableau Datasource</td><td><code id="settingsTableauPath">-</code></td></tr>
+                <tr><td style="color:var(--muted)">AI Context</td><td><code id="settingsAiContextPath">-</code></td></tr>
+                <tr><td style="color:var(--muted)">AI Draft</td><td><code id="settingsAiDraftPath">-</code></td></tr>
+                <tr><td style="color:var(--muted)">Reports PDF</td><td><code id="settingsPdfPath">-</code></td></tr>
+                <tr><td style="color:var(--muted)">Logs</td><td><code id="settingsLogsPath">-</code></td></tr>
+                <tr><td style="color:var(--muted)">Temp</td><td><code id="settingsTempPath">-</code></td></tr>
+                <tr><td style="color:var(--muted)">Secrets</td><td><span id="settingsSecretsStatus" class="badge-sm warn">-</span></td></tr>
+              </table>
+            </div>
+          </div>
+
+          <!-- Tab: Security -->
+          <div class="tab-panel" data-tab="security">
+            <div class="panel">
+              <div class="panel-heading"><h3>Git 安全检查</h3></div>
+              <table>
+                <tr><td style="color:var(--muted);width:160px">.gitignore 覆盖</td><td><span id="settingsGitignoreStatus" class="badge-sm warn">未检查</span></td></tr>
+                <tr><td style="color:var(--muted)">Secrets 已忽略</td><td><span id="settingsSecretsIgnored" class="badge-sm warn">未检查</span></td></tr>
+                <tr><td style="color:var(--muted)">根目录遗留检查</td><td><span id="settingsLegacyDirStatus" class="badge-sm warn">未检查</span></td></tr>
+              </table>
+            </div>
+            <div class="panel">
+              <div class="panel-heading"><h3>系统状态</h3></div>
+              <table>
+                <tr><td style="color:var(--muted);width:160px">DeepSeek AI</td><td><span class="badge-sm warn">暂未配置</span></td></tr>
+                <tr><td style="color:var(--muted)">SMTP 邮件</td><td><span class="badge-sm warn">Dry-run 模式</span></td></tr>
+                <tr><td style="color:var(--muted)">Tableau</td><td><span class="badge-sm warn">暂未启用</span></td></tr>
               </table>
             </div>
           </div>
